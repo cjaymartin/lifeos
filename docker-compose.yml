@@ -1,0 +1,18 @@
+services:
+  lifeos:
+    build: .
+    restart: unless-stopped
+    expose:
+      - "4321"
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lifeos.rule=Host(`lifeos.localhost`) || Host(`lifeos.wolfdivided`)"
+      - "traefik.http.routers.lifeos.entrypoints=websecure"
+      - "traefik.http.routers.lifeos.tls=true"
+      - "traefik.http.services.lifeos.loadbalancer.server.port=4321"
+
+networks:
+  traefik_proxy:
+    external: true

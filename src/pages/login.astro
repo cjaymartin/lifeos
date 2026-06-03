@@ -1,0 +1,192 @@
+---
+import { verifySession } from '@/lib/auth';
+
+const secret = import.meta.env.SESSION_SECRET ?? '';
+const cookie = Astro.cookies.get('lifeos_session')?.value;
+if (verifySession(cookie, secret)) return Astro.redirect('/');
+
+const error = Astro.url.searchParams.get('error');
+---
+
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>LifeOS — Sign in</title>
+    <script is:inline>
+      try { document.documentElement.className = localStorage.getItem('theme') ?? 'dark'; } catch {}
+    </script>
+    <style>
+      @import url('/src/styles/globals.css');
+      @keyframes shake {
+        0%,100% { transform: translateX(0); }
+        20%     { transform: translateX(-6px); }
+        40%     { transform: translateX(6px); }
+        60%     { transform: translateX(-4px); }
+        80%     { transform: translateX(4px); }
+      }
+      .shake { animation: shake 0.35s ease; }
+    </style>
+  </head>
+  <body class="min-h-screen bg-background flex items-center justify-center">
+    <div class="w-full max-w-xs space-y-8 px-4">
+
+      <!-- Logo -->
+      <div class="text-center space-y-2">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-foreground/10 mb-3">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor" opacity="0.9"/>
+            <rect x="13" y="3" width="8" height="8" rx="1.5" fill="currentColor" opacity="0.6"/>
+            <rect x="3" y="13" width="8" height="8" rx="1.5" fill="currentColor" opacity="0.6"/>
+            <rect x="13" y="13" width="8" height="8" rx="1.5" fill="currentColor" opacity="0.3"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-semibold tracking-tight text-foreground">LifeOS</h1>
+        <p class="text-sm text-muted-foreground">Your personal operating system</p>
+      </div>
+
+      {error && (
+        <p class="text-sm text-center text-destructive" id="server-error">
+          {error === 'invalid' ? 'Invalid code — try again.' : 'Authentication failed.'}
+        </p>
+      )}
+
+      <!-- Passkey -->
+      <button
+        id="passkey-btn"
+        type="button"
+        class="flex items-center justify-center gap-2.5 w-full h-11 rounded-lg
+               bg-primary text-primary-foreground text-sm font-medium
+               hover:bg-primary/90 transition-colors disabled:opacity-50"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/>
+          <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+        </svg>
+        Sign in with passkey
+      </button>
+
+      <!-- Divider -->
+      <div class="relative">
+        <div class="absolute inset-0 flex items-center">
+          <span class="w-full border-t border-border"></span>
+        </div>
+        <div class="relative flex justify-center text-xs">
+          <span class="bg-background px-2 text-muted-foreground">or use authenticator code</span>
+        </div>
+      </div>
+
+      <!-- TOTP -->
+      <form id="totp-form" class="space-y-3" novalidate>
+        <input
+          id="totp-input"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="8"
+          placeholder="000000"
+          class="flex h-11 w-full rounded-lg border border-input bg-background px-4 py-2
+                 text-center text-xl tracking-[0.5em] font-mono text-foreground
+                 placeholder:text-muted-foreground/40 placeholder:tracking-normal
+                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                 transition-colors"
+        />
+        <button
+          type="submit"
+          class="flex items-center justify-center w-full h-10 rounded-lg border border-border
+                 bg-card text-foreground text-sm font-medium
+                 hover:bg-accent transition-colors disabled:opacity-50"
+        >
+          Verify code
+        </button>
+        <p id="totp-error" class="text-xs text-center text-destructive hidden">Invalid code — try again.</p>
+
+      </form>
+
+    </div>
+
+    <script>
+      import { startAuthentication } from '@simplewebauthn/browser';
+
+      // ── Passkey ──────────────────────────────────────────────────────────────
+      document.getElementById('passkey-btn')!.addEventListener('click', async () => {
+        const btn = document.getElementById('passkey-btn') as HTMLButtonElement;
+        btn.disabled = true;
+        btn.textContent = 'Waiting for passkey…';
+
+        try {
+          const optRes = await fetch('/api/auth/passkey/challenge');
+          const options = await optRes.json();
+          const assertion = await startAuthentication({ optionsJSON: options });
+
+          const verRes = await fetch('/api/auth/passkey/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(assertion),
+          });
+
+          if (verRes.ok) {
+            window.location.href = '/';
+          } else {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg> Sign in with passkey`;
+            showError('Passkey verification failed.');
+          }
+        } catch (err: any) {
+          btn.disabled = false;
+          btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg> Sign in with passkey`;
+          if (err.name !== 'NotAllowedError') showError('No passkeys found or cancelled.');
+        }
+      });
+
+      // ── TOTP ─────────────────────────────────────────────────────────────────
+      const totpForm = document.getElementById('totp-form') as HTMLFormElement;
+      const totpInput = document.getElementById('totp-input') as HTMLInputElement;
+      const totpError = document.getElementById('totp-error') as HTMLParagraphElement;
+
+      // Auto-submit when 6 digits entered
+      totpInput.addEventListener('input', () => {
+        totpInput.value = totpInput.value.replace(/\D/g, '').slice(0, 6);
+        if (totpInput.value.length === 6) totpForm.requestSubmit();
+      });
+
+      totpForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        totpError.classList.add('hidden');
+        const token = totpInput.value;
+        if (token.length !== 6) return;
+
+        const res = await fetch('/api/auth/totp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          totpError.classList.remove('hidden');
+          totpInput.classList.add('shake', 'border-destructive');
+          totpInput.addEventListener('animationend', () => {
+            totpInput.classList.remove('shake');
+            totpInput.value = '';
+            totpInput.classList.remove('border-destructive');
+            totpInput.focus();
+          }, { once: true });
+        }
+      });
+
+      function showError(msg: string) {
+        let el = document.getElementById('server-error') as HTMLParagraphElement;
+        if (!el) {
+          el = document.createElement('p');
+          el.id = 'server-error';
+          el.className = 'text-sm text-center text-destructive';
+          totpForm.before(el);
+        }
+        el.textContent = msg;
+      }
+    </script>
+  </body>
+</html>

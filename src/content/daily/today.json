@@ -1,0 +1,6 @@
+{
+  "date": "2026-06-03",
+  "greeting": "Good morning, CJ.",
+  "briefing": "Your daily briefing will appear here once the morning cron is set up. Each day, Claude will populate this file with a summary tailored to you.",
+  "items": []
+}

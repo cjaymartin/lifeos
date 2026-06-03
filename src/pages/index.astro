@@ -1,0 +1,85 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro';
+import { stacks } from '@/lib/stacks';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
+
+let daily = { date: '', greeting: 'Good morning.', briefing: '', items: [] as string[] };
+try {
+  const raw = await readFile(join(process.cwd(), 'src/content/daily/today.json'), 'utf-8');
+  daily = JSON.parse(raw);
+} catch {}
+
+const now = new Date();
+const dateLabel = now.toLocaleDateString('en-US', {
+  weekday: 'long',
+  month: 'long',
+  day: 'numeric',
+});
+
+const dashboardStacks = stacks.filter((s) => s.dashboardWidget);
+---
+
+<AppLayout title="Dashboard">
+  <div class="p-6 md:p-10 max-w-5xl mx-auto space-y-8">
+
+    <!-- Header -->
+    <div class="space-y-1">
+      <p class="text-sm text-muted-foreground">{dateLabel}</p>
+      <h1 class="text-2xl font-semibold text-foreground">{daily.greeting}</h1>
+    </div>
+
+    <!-- Daily Briefing card -->
+    <section class="rounded-xl border border-border bg-card p-6 space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-medium text-foreground">Daily Briefing</span>
+        <span class="text-xs text-muted-foreground ml-auto">{daily.date || dateLabel}</span>
+      </div>
+      <p class="text-sm text-muted-foreground leading-relaxed">
+        {daily.briefing || 'No briefing available yet.'}
+      </p>
+      {daily.items.length > 0 && (
+        <ul class="space-y-1.5 pt-1">
+          {daily.items.map((item) => (
+            <li class="flex items-start gap-2 text-sm text-muted-foreground">
+              <span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <!-- Stack widgets -->
+    {dashboardStacks.length > 0 && (
+      <section class="space-y-3">
+        <h2 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Stacks</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {dashboardStacks.map((stack) => (
+            <a
+              href={stack.href}
+              class="group rounded-xl border border-border bg-card p-5 space-y-2
+                     hover:bg-accent/30 transition-colors"
+            >
+              <p class="text-sm font-medium text-foreground">{stack.label}</p>
+              {stack.description && (
+                <p class="text-xs text-muted-foreground">{stack.description}</p>
+              )}
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <!-- Empty state -->
+    {dashboardStacks.length === 0 && (
+      <section class="rounded-xl border border-dashed border-border p-8 text-center space-y-2">
+        <p class="text-sm font-medium text-foreground">No stacks yet</p>
+        <p class="text-xs text-muted-foreground">
+          Ask Claude to build a stack — Recipes, Tasks, Budget, or anything else.
+        </p>
+      </section>
+    )}
+
+  </div>
+</AppLayout>

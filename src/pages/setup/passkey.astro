@@ -1,0 +1,129 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro';
+import { loadCredentials } from '@/lib/webauthn';
+
+const credentials = await loadCredentials();
+---
+
+<AppLayout title="Manage passkeys">
+  <div class="p-6 md:p-10 max-w-2xl mx-auto space-y-8">
+
+    <div class="space-y-1">
+      <h1 class="text-2xl font-semibold text-foreground">Passkeys</h1>
+      <p class="text-sm text-muted-foreground">
+        Register a passkey from your password manager or device. Once set up you can use it instead of your authenticator code.
+      </p>
+    </div>
+
+    <!-- Registered passkeys -->
+    {credentials.length > 0 && (
+      <section class="space-y-2">
+        <h2 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Registered</h2>
+        <div class="divide-y divide-border rounded-xl border border-border overflow-hidden" id="cred-list">
+          {credentials.map((c) => (
+            <div class="flex items-center justify-between px-4 py-3 bg-card" data-id={c.id}>
+              <div class="space-y-0.5">
+                <p class="text-sm font-medium text-foreground">{c.name}</p>
+                <p class="text-xs text-muted-foreground">
+                  Added {new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+              <button
+                class="delete-btn text-xs text-destructive hover:text-destructive/80 transition-colors"
+                data-id={c.id}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <!-- Register new -->
+    <section class="space-y-3">
+      <h2 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Add new passkey</h2>
+      <div class="flex gap-2">
+        <input
+          id="passkey-name"
+          type="text"
+          placeholder="e.g. 1Password, YubiKey"
+          class="flex-1 h-10 rounded-lg border border-input bg-background px-3 text-sm
+                 text-foreground placeholder:text-muted-foreground
+                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+        />
+        <button
+          id="register-btn"
+          type="button"
+          class="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium
+                 hover:bg-primary/90 transition-colors disabled:opacity-50"
+        >
+          Register
+        </button>
+      </div>
+      <p id="reg-status" class="text-sm text-muted-foreground hidden"></p>
+    </section>
+
+  </div>
+
+  <script>
+    import { startRegistration } from '@simplewebauthn/browser';
+
+    // Register new passkey
+    document.getElementById('register-btn')!.addEventListener('click', async () => {
+      const btn = document.getElementById('register-btn') as HTMLButtonElement;
+      const nameInput = document.getElementById('passkey-name') as HTMLInputElement;
+      const status = document.getElementById('reg-status') as HTMLParagraphElement;
+
+      const name = nameInput.value.trim() || 'Passkey';
+      btn.disabled = true;
+      status.textContent = 'Waiting for authenticator…';
+      status.className = 'text-sm text-muted-foreground';
+      status.classList.remove('hidden');
+
+      try {
+        const optRes = await fetch('/api/auth/passkey/register-challenge');
+        const options = await optRes.json();
+        const regResponse = await startRegistration({ optionsJSON: options });
+
+        const verRes = await fetch('/api/auth/passkey/register-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ response: regResponse, name }),
+        });
+
+        if (verRes.ok) {
+          status.textContent = '✓ Passkey registered! Refreshing…';
+          status.className = 'text-sm text-emerald-500';
+          setTimeout(() => window.location.reload(), 800);
+        } else {
+          const { error } = await verRes.json();
+          status.textContent = `Registration failed: ${error}`;
+          status.className = 'text-sm text-destructive';
+          btn.disabled = false;
+        }
+      } catch (err: any) {
+        status.textContent = err.name === 'NotAllowedError' ? 'Cancelled.' : `Error: ${err.message}`;
+        status.className = 'text-sm text-destructive';
+        btn.disabled = false;
+      }
+    });
+
+    // Delete passkey
+    document.querySelectorAll('.delete-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = (btn as HTMLElement).dataset.id!;
+        if (!confirm('Remove this passkey?')) return;
+        const res = await fetch('/api/auth/passkey/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+        if (res.ok) {
+          const row = document.querySelector(`[data-id="${id}"]`);
+          row?.remove();
+        }
+      });
+    });
+  </script>
+</AppLayout>
