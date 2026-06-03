@@ -15,6 +15,19 @@ Gather data from all sources, synthesise a brief, and write `src/content/daily/t
 
 ---
 
+## Step 0 — Check widget registry
+
+Read `src/content/widgets/registry.json`. Note which widgets are enabled and their `populator` field. Only collect data for widgets that are enabled. Steps below map to populators:
+
+- Step 2 (Todoist tasks) → needed if any widget has `"populator": "populate-daily step-2"`
+- Step 3 (Google Calendar) → needed if any widget has `"populator": "populate-daily step-3"`
+- Step 4 (Weather) → needed if any widget has `"populator": "populate-daily step-4"`
+- Step 5 (Trash) → needed if any widget has `"populator": "populate-daily step-5"`
+
+If the registry file doesn't exist or can't be read, run all steps (safe default).
+
+---
+
 ## Step 1 — Get today's date
 
 Use `currentDate` from context or run `date` in bash. Format: YYYY-MM-DD. Also derive:

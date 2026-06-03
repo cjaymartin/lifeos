@@ -1,0 +1,77 @@
+{
+  "_note": "Widget registry — controls what appears on the dashboard, in what order, and with what config. Manage via /widget skill.",
+  "widgets": [
+    {
+      "id": "trash",
+      "type": "trash",
+      "label": "Trash & Recycling",
+      "enabled": true,
+      "order": 10,
+      "size": "card",
+      "displayCondition": "mon-to-trash-day",
+      "config": {
+        "trashDay": "Wednesday",
+        "pickupBy": "7 AM"
+      },
+      "dataKey": "trash",
+      "populator": "populate-daily step-5"
+    },
+    {
+      "id": "weather",
+      "type": "weather",
+      "label": "Weather",
+      "enabled": true,
+      "order": 20,
+      "size": "card",
+      "displayCondition": "has-data",
+      "config": {
+        "lat": 41.6534,
+        "lon": -70.8148,
+        "units": "fahrenheit"
+      },
+      "dataKey": "weather",
+      "populator": "populate-daily step-4"
+    },
+    {
+      "id": "tasks",
+      "type": "tasks",
+      "label": "Tasks",
+      "enabled": true,
+      "order": 30,
+      "size": "card",
+      "displayCondition": "has-data",
+      "config": {
+        "source": "todoist",
+        "maxItems": 5
+      },
+      "dataKey": "tasks",
+      "populator": "populate-daily step-2"
+    },
+    {
+      "id": "calendar",
+      "type": "calendar",
+      "label": "Today",
+      "enabled": true,
+      "order": 40,
+      "size": "full",
+      "displayCondition": "has-events",
+      "config": {
+        "source": "google-calendar"
+      },
+      "dataKey": "calendar",
+      "populator": "populate-daily step-3"
+    },
+    {
+      "id": "briefing",
+      "type": "briefing",
+      "label": "Daily Briefing",
+      "enabled": true,
+      "order": 50,
+      "size": "full",
+      "displayCondition": "has-data",
+      "config": {},
+      "dataKey": "briefing",
+      "populator": "populate-daily step-6"
+    }
+  ]
+}

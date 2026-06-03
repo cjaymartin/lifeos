@@ -4,7 +4,19 @@ import { stacks } from '@/lib/stacks';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
-// ── Load daily data ───────────────────────────────────────────────────────────
+interface WidgetDef {
+  id: string;
+  type: string;
+  label: string;
+  enabled: boolean;
+  order: number;
+  size: 'card' | 'full';
+  displayCondition?: string;
+  config: Record<string, unknown>;
+  dataKey: string;
+  populator?: string;
+}
+
 interface DailyData {
   date: string;
   greeting: string;
@@ -17,27 +29,62 @@ interface DailyData {
   calendar?: { title: string; time: string; soon: boolean }[];
   trash?: { today: boolean; recycling: boolean; note: string | null };
   items?: string[];
+  [key: string]: unknown;
 }
 
+// Load widget registry
+let registry: { widgets: WidgetDef[] } = { widgets: [] };
+try {
+  const raw = await readFile(join(process.cwd(), 'src/content/widgets/registry.json'), 'utf-8');
+  registry = JSON.parse(raw);
+} catch {}
+
+// Load daily data
 let daily: DailyData | null = null;
 try {
   const raw = await readFile(join(process.cwd(), 'src/content/daily/today.json'), 'utf-8');
   daily = JSON.parse(raw);
 } catch {}
 
-// ── Date helpers ──────────────────────────────────────────────────────────────
+// Date helpers
 const now = new Date();
 const dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-// Use noon on the stored date to avoid DST edge cases
 const dayOfWeek = daily?.date
-  ? new Date(daily.date + 'T12:00:00').getDay()   // 0=Sun 1=Mon … 3=Wed
+  ? new Date(daily.date + 'T12:00:00').getDay()
   : now.getDay();
 
-// Trash banner: show Mon(1) → Wed(3), hide Thu–Sun
-const showTrashBanner = dayOfWeek >= 1 && dayOfWeek <= 3 && !!daily?.trash;
-const isTrashDay      = dayOfWeek === 3;
+// Evaluate display condition
+function shouldShow(w: WidgetDef): boolean {
+  switch (w.displayCondition) {
+    case 'mon-to-trash-day': return dayOfWeek >= 1 && dayOfWeek <= 3;
+    case 'has-events': {
+      const d = daily?.[w.dataKey];
+      return Array.isArray(d) && d.length > 0;
+    }
+    case 'has-data': return !!daily?.[w.dataKey];
+    default: return true;
+  }
+}
 
-// ── Weather icon SVG (inline, WMO code-based) ─────────────────────────────────
+// Sort enabled widgets and split by layout
+const sortedWidgets = [...registry.widgets]
+  .filter(w => w.enabled)
+  .sort((a, b) => a.order - b.order);
+const visibleWidgets = sortedWidgets.filter(shouldShow);
+const cardWidgets = visibleWidgets.filter(w => w.size === 'card');
+const fullWidgets  = visibleWidgets.filter(w => w.size === 'full');
+
+// Trash banner — any enabled trash widget whose condition is met
+const trashWidget = visibleWidgets.find(w => w.type === 'trash');
+const showTrashBanner = !!trashWidget && !!daily?.trash;
+const isTrashDay = dayOfWeek === 3;
+
+// Grid class based on visible card count
+const gridCols = cardWidgets.length <= 1 ? 'md:grid-cols-1'
+               : cardWidgets.length === 2 ? 'md:grid-cols-2'
+               : 'md:grid-cols-3';
+
+// Weather SVG (WMO code-based)
 function weatherSVG(code: number): string {
   const sunRays = `
     <line x1="32" y1="4"  x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
@@ -50,14 +97,12 @@ function weatherSVG(code: number): string {
     <line x1="18" y1="46" x2="11" y2="53" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`;
 
   if (code === 0 || code === 1) {
-    // Sun
     return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-amber-400">
       ${sunRays}
       <circle cx="32" cy="32" r="11" fill="currentColor"/>
     </svg>`;
   }
   if (code <= 3) {
-    // Partly cloudy — sun + cloud
     return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
       <g class="text-amber-400">
         <line x1="14" y1="10" x2="14" y2="17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
@@ -75,7 +120,6 @@ function weatherSVG(code: number): string {
     </svg>`;
   }
   if (code <= 48) {
-    // Fog
     return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-zinc-400">
       <path d="M50 22H24c-5.523 0-10-4.477-10-10 0-5.523 4.477-10 10-10 .34 0 .677.017 1.01.05A12 12 0 0 1 50 10c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor" opacity="0.6"/>
       <line x1="10" y1="34" x2="54" y2="34" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
@@ -84,7 +128,6 @@ function weatherSVG(code: number): string {
     </svg>`;
   }
   if (code <= 67 || (code >= 80 && code <= 82)) {
-    // Rain
     return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-blue-400">
       <path d="M50 30H28c-5.523 0-10-4.477-10-10s4.477-10 10-10c.34 0 .677.017 1.01.05A12 12 0 0 1 50 18c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor" opacity="0.7"/>
       <line x1="22" y1="40" x2="18" y2="52" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
@@ -93,7 +136,6 @@ function weatherSVG(code: number): string {
     </svg>`;
   }
   if (code <= 77) {
-    // Snow
     return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-sky-300">
       <path d="M50 30H28c-5.523 0-10-4.477-10-10s4.477-10 10-10c.34 0 .677.017 1.01.05A12 12 0 0 1 50 18c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor" opacity="0.5"/>
       <circle cx="22" cy="48" r="3" fill="currentColor"/>
@@ -101,40 +143,35 @@ function weatherSVG(code: number): string {
       <circle cx="42" cy="48" r="3" fill="currentColor"/>
     </svg>`;
   }
-  // Thunderstorm
   return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-yellow-400">
     <path d="M50 28H28c-5.523 0-10-4.477-10-10s4.477-10 10-10c.34 0 .677.017 1.01.05A12 12 0 0 1 50 16c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor" opacity="0.5" class="text-zinc-400"/>
     <polyline points="36,34 28,48 34,48 26,62" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   </svg>`;
 }
 
+const weatherIcon = daily?.weather ? weatherSVG(daily.weather.code) : null;
 const dashboardStacks = stacks.filter(s => s.dashboardWidget);
-const weatherIcon = daily?.weather ? weatherSVG(daily.weather.code) : weatherSVG(0);
 ---
 
 <AppLayout title="Dashboard">
   <div class="min-h-full">
 
-    {/* ── Trash banner ────────────────────────────────────────────────────── */}
+    {/* ── Trash banner ─────────────────────────────────────────────────── */}
     {showTrashBanner && (
       <div class={`border-b px-6 py-3 flex items-center gap-3 ${
-        isTrashDay
-          ? 'bg-amber-500/15 border-amber-500/40'
-          : 'bg-card border-border'
+        isTrashDay ? 'bg-amber-500/15 border-amber-500/40' : 'bg-card border-border'
       }`}>
-        {/* Trash icon */}
         <svg class={`w-5 h-5 shrink-0 ${isTrashDay ? 'text-amber-400' : 'text-muted-foreground'}`}
-             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 6 5 6 21 6"/>
           <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
           <path d="M10 11v6M14 11v6"/>
           <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
         </svg>
-
         {isTrashDay ? (
           <span class="text-sm font-semibold text-amber-400">
-            Trash
-            {daily?.trash?.recycling ? ' + Recycling' : ''} goes out TODAY
+            Trash{daily?.trash?.recycling ? ' + Recycling' : ''} goes out TODAY
             {daily?.trash?.note ? ` — ${daily.trash.note}` : ' — put it out by 7 AM'}
           </span>
         ) : (
@@ -147,7 +184,7 @@ const weatherIcon = daily?.weather ? weatherSVG(daily.weather.code) : weatherSVG
 
     <div class="p-6 md:p-10 space-y-6 max-w-5xl mx-auto">
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div class="space-y-0.5">
         <p class="text-sm text-muted-foreground">{dateLabel}</p>
         <h1 class="text-2xl font-semibold text-foreground">
@@ -155,158 +192,219 @@ const weatherIcon = daily?.weather ? weatherSVG(daily.weather.code) : weatherSVG
         </h1>
       </div>
 
-      {/* ── Top row: Trash? + Weather + Tasks ───────────────────────────────── */}
-      <div class={`grid grid-cols-1 gap-4 ${showTrashBanner ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-
-        {/* Trash card — first when visible */}
-        {showTrashBanner && daily?.trash && (
-          <div class={`rounded-xl border p-5 flex flex-col justify-between gap-3 ${
-            isTrashDay
-              ? 'bg-amber-500/10 border-amber-500/40'
-              : 'bg-card border-border'
-          }`}>
-            <div class="flex items-start justify-between">
-              <div class="space-y-0.5">
-                <span class={`text-xs font-semibold uppercase tracking-wider ${isTrashDay ? 'text-amber-400' : 'text-muted-foreground'}`}>
-                  {isTrashDay ? 'Today' : 'Coming up'}
-                </span>
-                <p class={`text-base font-semibold ${isTrashDay ? 'text-amber-300' : 'text-foreground'}`}>
-                  {isTrashDay ? 'Trash Day' : 'Trash — Wednesday'}
-                </p>
-              </div>
-              <svg class={`w-8 h-8 shrink-0 ${isTrashDay ? 'text-amber-400' : 'text-muted-foreground/50'}`}
-                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                <path d="M10 11v6M14 11v6"/>
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-              </svg>
-            </div>
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  isTrashDay ? 'bg-amber-500/20 text-amber-300' : 'bg-muted text-muted-foreground'
-                }`}>Trash</span>
-                {daily.trash.recycling && (
-                  <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    isTrashDay ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground'
-                  }`}>+ Recycling</span>
-                )}
-              </div>
-              {daily.trash.note && (
-                <p class="text-xs text-amber-400/80">{daily.trash.note}</p>
+      {/* ── Card row ────────────────────────────────────────────────────── */}
+      {cardWidgets.length > 0 && (
+        <div class={`grid grid-cols-1 gap-4 ${gridCols}`}>
+          {cardWidgets.map(w => (
+            <>
+              {/* ── trash ── */}
+              {w.type === 'trash' && daily?.trash && (
+                <div class={`rounded-xl border p-5 flex flex-col justify-between gap-3 ${
+                  isTrashDay ? 'bg-amber-500/10 border-amber-500/40' : 'bg-card border-border'
+                }`}>
+                  <div class="flex items-start justify-between">
+                    <div class="space-y-0.5">
+                      <span class={`text-xs font-semibold uppercase tracking-wider ${
+                        isTrashDay ? 'text-amber-400' : 'text-muted-foreground'
+                      }`}>
+                        {isTrashDay ? 'Today' : 'Coming up'}
+                      </span>
+                      <p class={`text-base font-semibold ${isTrashDay ? 'text-amber-300' : 'text-foreground'}`}>
+                        {isTrashDay ? 'Trash Day' : `Trash — ${String(w.config.trashDay ?? 'Wednesday')}`}
+                      </p>
+                    </div>
+                    <svg class={`w-8 h-8 shrink-0 ${isTrashDay ? 'text-amber-400' : 'text-muted-foreground/50'}`}
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                         stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                      <path d="M10 11v6M14 11v6"/>
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    </svg>
+                  </div>
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                      <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        isTrashDay ? 'bg-amber-500/20 text-amber-300' : 'bg-muted text-muted-foreground'
+                      }`}>Trash</span>
+                      {daily.trash.recycling && (
+                        <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          isTrashDay ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground'
+                        }`}>+ Recycling</span>
+                      )}
+                    </div>
+                    {daily.trash.note && (
+                      <p class="text-xs text-amber-400/80">{daily.trash.note}</p>
+                    )}
+                    {isTrashDay && (
+                      <p class="text-xs text-muted-foreground">
+                        Put out by {String(w.config.pickupBy ?? '7 AM')}
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
-              {isTrashDay && (
-                <p class="text-xs text-muted-foreground">Put out by 7 AM</p>
+
+              {/* ── weather ── */}
+              {w.type === 'weather' && daily?.weather && weatherIcon && (
+                <div class="rounded-xl border border-border bg-card p-5 flex gap-4 items-start">
+                  <div class="w-14 h-14 shrink-0">
+                    <Fragment set:html={weatherIcon} />
+                  </div>
+                  <div class="flex-1 space-y-1 min-w-0">
+                    <div class="flex items-baseline gap-2">
+                      <span class="text-3xl font-semibold text-foreground tabular-nums">
+                        {Math.round(daily.weather.current)}°
+                      </span>
+                      <span class="text-sm text-muted-foreground">
+                        feels {Math.round(daily.weather.feelsLike)}°
+                      </span>
+                    </div>
+                    <p class="text-sm font-medium text-foreground">{daily.weather.condition}</p>
+                    <div class="flex flex-wrap gap-x-4 gap-y-0.5 pt-1">
+                      <span class="text-xs text-muted-foreground">
+                        ↑ {daily.weather.high}° / ↓ {daily.weather.low}°
+                      </span>
+                      {daily.weather.wind > 0 && (
+                        <span class="text-xs text-muted-foreground">💨 {daily.weather.wind} mph</span>
+                      )}
+                      <span class="text-xs text-muted-foreground">{daily.weather.precipitation}</span>
+                    </div>
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
-        )}
 
-        {/* Weather */}
-        {daily?.weather && (
-          <div class="rounded-xl border border-border bg-card p-5 flex gap-4 items-start">
-            <div class="w-14 h-14 shrink-0">
-              <Fragment set:html={weatherIcon} />
-            </div>
-            <div class="flex-1 space-y-1 min-w-0">
-              <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-semibold text-foreground tabular-nums">
-                  {Math.round(daily.weather.current)}°
-                </span>
-                <span class="text-sm text-muted-foreground">
-                  feels {Math.round(daily.weather.feelsLike)}°
-                </span>
-              </div>
-              <p class="text-sm font-medium text-foreground">{daily.weather.condition}</p>
-              <div class="flex flex-wrap gap-x-4 gap-y-0.5 pt-1">
-                <span class="text-xs text-muted-foreground">
-                  ↑ {daily.weather.high}° / ↓ {daily.weather.low}°
-                </span>
-                {daily.weather.wind > 0 && (
-                  <span class="text-xs text-muted-foreground">
-                    💨 {daily.weather.wind} mph
-                  </span>
-                )}
-                <span class="text-xs text-muted-foreground">{daily.weather.precipitation}</span>
-              </div>
-            </div>
-          </div>
-        )}
+              {/* ── tasks ── */}
+              {w.type === 'tasks' && daily?.tasks && (
+                <div class="rounded-xl border border-border bg-card p-5 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-foreground">{w.label}</span>
+                    <div class="flex gap-2">
+                      {daily.tasks.dueToday > 0 && (
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
+                          {daily.tasks.dueToday} today
+                        </span>
+                      )}
+                      {daily.tasks.overdue > 0 && (
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive font-medium">
+                          {daily.tasks.overdue} overdue
+                        </span>
+                      )}
+                      {daily.tasks.dueToday === 0 && daily.tasks.overdue === 0 && (
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 font-medium">
+                          All clear
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {daily.tasks.items.length > 0 && (
+                    <ul class="space-y-1.5">
+                      {daily.tasks.items.slice(0, Number(w.config.maxItems ?? 5)).map(item => (
+                        <li class="flex items-start gap-2 text-xs text-muted-foreground">
+                          <span class="mt-1 h-1.5 w-1.5 rounded-full bg-destructive/60 shrink-0"/>
+                          {item}
+                        </li>
+                      ))}
+                      {daily.tasks.items.length > Number(w.config.maxItems ?? 5) && (
+                        <li class="text-xs text-muted-foreground/60 pl-3.5">
+                          +{daily.tasks.items.length - Number(w.config.maxItems ?? 5)} more
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
 
-        {/* Tasks */}
-        {daily?.tasks && (
-          <div class="rounded-xl border border-border bg-card p-5 space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-foreground">Tasks</span>
-              <div class="flex gap-2">
-                {daily.tasks.dueToday > 0 && (
-                  <span class="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
-                    {daily.tasks.dueToday} today
+              {/* ── stat ── */}
+              {w.type === 'stat' && daily?.[w.dataKey] != null && (
+                <div class="rounded-xl border border-border bg-card p-5 space-y-1">
+                  <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {w.label}
                   </span>
-                )}
-                {daily.tasks.overdue > 0 && (
-                  <span class="text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive font-medium">
-                    {daily.tasks.overdue} overdue
-                  </span>
-                )}
-                {daily.tasks.dueToday === 0 && daily.tasks.overdue === 0 && (
-                  <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 font-medium">
-                    All clear
-                  </span>
-                )}
-              </div>
-            </div>
-            {daily.tasks.items.length > 0 && (
-              <ul class="space-y-1.5">
-                {daily.tasks.items.slice(0, 5).map(item => (
-                  <li class="flex items-start gap-2 text-xs text-muted-foreground">
-                    <span class="mt-1 h-1.5 w-1.5 rounded-full bg-destructive/60 shrink-0"/>
-                    {item}
-                  </li>
-                ))}
-                {daily.tasks.items.length > 5 && (
-                  <li class="text-xs text-muted-foreground/60 pl-3.5">
-                    +{daily.tasks.items.length - 5} more
-                  </li>
-                )}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
+                  <p class="text-3xl font-semibold text-foreground tabular-nums">
+                    {String(daily[w.dataKey])}
+                  </p>
+                  {w.config.unit && (
+                    <p class="text-xs text-muted-foreground">{String(w.config.unit)}</p>
+                  )}
+                </div>
+              )}
 
-      {/* ── Calendar (only when events exist) ─────────────────────────────────── */}
-      {daily?.calendar && daily.calendar.length > 0 && (
-        <div class="rounded-xl border border-border bg-card p-5 space-y-3">
-          <span class="text-sm font-medium text-foreground">Today</span>
-          <ul class="space-y-2">
-            {daily.calendar.map(event => (
-              <li class="flex items-center gap-3">
-                <span class={`text-xs font-mono tabular-nums shrink-0 ${event.soon ? 'text-amber-400 font-semibold' : 'text-muted-foreground'}`}>
-                  {event.time}
-                </span>
-                <span class={`text-sm ${event.soon ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                  {event.title}
-                </span>
-                {event.soon && (
-                  <span class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">soon</span>
-                )}
-              </li>
-            ))}
-          </ul>
+              {/* ── note (card) ── */}
+              {w.type === 'note' && w.size === 'card' && w.config.content && (
+                <div class={`rounded-xl border p-5 space-y-1.5 ${
+                  w.config.style === 'warning' ? 'bg-amber-500/10 border-amber-500/40' :
+                  w.config.style === 'success'  ? 'bg-emerald-500/10 border-emerald-500/40' :
+                  'bg-card border-border'
+                }`}>
+                  {w.label && (
+                    <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {w.label}
+                    </span>
+                  )}
+                  <p class="text-sm text-foreground">{String(w.config.content)}</p>
+                </div>
+              )}
+            </>
+          ))}
         </div>
       )}
 
-      {/* ── Briefing paragraph ────────────────────────────────────────────────── */}
-      {daily?.briefing && (
-        <p class="text-sm text-muted-foreground leading-relaxed border-l-2 border-border pl-4 italic">
-          {daily.briefing}
-        </p>
-      )}
+      {/* ── Full-width widgets ───────────────────────────────────────────── */}
+      {fullWidgets.map(w => (
+        <>
+          {/* ── calendar ── */}
+          {w.type === 'calendar' && daily?.calendar && daily.calendar.length > 0 && (
+            <div class="rounded-xl border border-border bg-card p-5 space-y-3">
+              <span class="text-sm font-medium text-foreground">{w.label}</span>
+              <ul class="space-y-2">
+                {daily.calendar.map(event => (
+                  <li class="flex items-center gap-3">
+                    <span class={`text-xs font-mono tabular-nums shrink-0 ${
+                      event.soon ? 'text-amber-400 font-semibold' : 'text-muted-foreground'
+                    }`}>
+                      {event.time}
+                    </span>
+                    <span class={`text-sm ${event.soon ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                      {event.title}
+                    </span>
+                    {event.soon && (
+                      <span class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
+                        soon
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-      {/* ── Stacks (additive, at the bottom) ──────────────────────────────────── */}
+          {/* ── briefing ── */}
+          {w.type === 'briefing' && daily?.briefing && (
+            <p class="text-sm text-muted-foreground leading-relaxed border-l-2 border-border pl-4 italic">
+              {daily.briefing}
+            </p>
+          )}
+
+          {/* ── note (full) ── */}
+          {w.type === 'note' && w.size === 'full' && w.config.content && (
+            <div class={`rounded-xl border p-5 ${
+              w.config.style === 'warning' ? 'bg-amber-500/10 border-amber-500/40' :
+              w.config.style === 'success'  ? 'bg-emerald-500/10 border-emerald-500/40' :
+              'bg-card border-border'
+            }`}>
+              {w.label && (
+                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                  {w.label}
+                </p>
+              )}
+              <p class="text-sm text-foreground">{String(w.config.content)}</p>
+            </div>
+          )}
+        </>
+      ))}
+
+      {/* ── Stacks (additive, at bottom) ────────────────────────────────── */}
       {dashboardStacks.length > 0 && (
         <section class="space-y-3 pt-4 border-t border-border">
           <h2 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stacks</h2>
@@ -324,11 +422,13 @@ const weatherIcon = daily?.weather ? weatherSVG(daily.weather.code) : weatherSVG
         </section>
       )}
 
-      {/* Empty state — no daily data at all */}
+      {/* ── Empty state ──────────────────────────────────────────────────── */}
       {!daily && (
         <div class="rounded-xl border border-dashed border-border p-10 text-center space-y-2">
           <p class="text-sm font-medium text-foreground">No briefing yet</p>
-          <p class="text-xs text-muted-foreground">Run <code class="font-mono bg-muted px-1 rounded">/populate-daily</code> to generate today's briefing.</p>
+          <p class="text-xs text-muted-foreground">
+            Run <code class="font-mono bg-muted px-1 rounded">/populate-daily</code> to generate today's briefing.
+          </p>
         </div>
       )}
 
