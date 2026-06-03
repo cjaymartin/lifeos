@@ -74,12 +74,14 @@ Write registry. No rebuild needed.
 Accepts changes to: `label`, `size`, `displayCondition`, `enabled`, or any `config` key.
 Merge only the specified fields into the existing widget entry. Write registry. No rebuild needed (unless a renderer change is also required).
 
+**`link`** is a universal config field supported on ALL card widget types. When present, a small external-link icon (↗) appears in the top-right corner of the card. It opens in a new tab.
+
 **config** changes for built-in types:
-- `trash` → `trashDay` (display string), `pickupBy` (time string)
-- `weather` → `lat`, `lon`, `units` ("fahrenheit"/"celsius")
-- `tasks` → `maxItems` (number, default 5), `source` ("todoist")
-- `stat` → `unit` (string), `source` ("manual")
-- `note` → `content` (text), `style` ("info"|"warning"|"success")
+- `trash` → `trashDay` (display string), `pickupBy` (time string), `link` (URL)
+- `weather` → `lat`, `lon`, `units` ("fahrenheit"/"celsius"), `link` (URL)
+- `tasks` → `maxItems` (number, default 5), `source` ("todoist"), `link` (URL)
+- `stat` → `unit` (string), `source` ("manual"), `link` (URL)
+- `note` → `content` (text), `style` ("info"|"warning"|"success"), `link` (URL)
 
 ### create (existing type)
 If the `type` already has a renderer in `src/pages/index.astro` (trash, weather, tasks, calendar, briefing, stat, note):

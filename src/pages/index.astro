@@ -199,28 +199,29 @@ const dashboardStacks = stacks.filter(s => s.dashboardWidget);
             <>
               {/* ── trash ── */}
               {w.type === 'trash' && daily?.trash && (
-                <div class={`rounded-xl border p-5 flex flex-col justify-between gap-3 ${
+                <div class={`relative rounded-xl border p-5 flex flex-col justify-between gap-3 ${
                   isTrashDay ? 'bg-amber-500/10 border-amber-500/40' : 'bg-card border-border'
                 }`}>
-                  <div class="flex items-start justify-between">
-                    <div class="space-y-0.5">
-                      <span class={`text-xs font-semibold uppercase tracking-wider ${
-                        isTrashDay ? 'text-amber-400' : 'text-muted-foreground'
-                      }`}>
-                        {isTrashDay ? 'Today' : 'Coming up'}
-                      </span>
-                      <p class={`text-base font-semibold ${isTrashDay ? 'text-amber-300' : 'text-foreground'}`}>
-                        {isTrashDay ? 'Trash Day' : `Trash — ${String(w.config.trashDay ?? 'Wednesday')}`}
-                      </p>
-                    </div>
-                    <svg class={`w-8 h-8 shrink-0 ${isTrashDay ? 'text-amber-400' : 'text-muted-foreground/50'}`}
-                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                         stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="3 6 5 6 21 6"/>
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                      <path d="M10 11v6M14 11v6"/>
-                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                    </svg>
+                  {w.config.link && (
+                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
+                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
+                       aria-label={`Open ${w.label}`}>
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                    </a>
+                  )}
+                  <div class="space-y-0.5">
+                    <span class={`text-xs font-semibold uppercase tracking-wider ${
+                      isTrashDay ? 'text-amber-400' : 'text-muted-foreground'
+                    }`}>
+                      {isTrashDay ? 'Today' : 'Coming up'}
+                    </span>
+                    <p class={`text-base font-semibold ${isTrashDay ? 'text-amber-300' : 'text-foreground'}`}>
+                      {isTrashDay ? 'Trash Day' : `Trash — ${String(w.config.trashDay ?? 'Wednesday')}`}
+                    </p>
                   </div>
                   <div class="space-y-1">
                     <div class="flex items-center gap-2">
@@ -247,7 +248,18 @@ const dashboardStacks = stacks.filter(s => s.dashboardWidget);
 
               {/* ── weather ── */}
               {w.type === 'weather' && daily?.weather && weatherIcon && (
-                <div class="rounded-xl border border-border bg-card p-5 flex gap-4 items-start">
+                <div class="relative rounded-xl border border-border bg-card p-5 flex gap-4 items-start">
+                  {w.config.link && (
+                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
+                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
+                       aria-label={`Open ${w.label}`}>
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                    </a>
+                  )}
                   <div class="w-14 h-14 shrink-0">
                     <Fragment set:html={weatherIcon} />
                   </div>
@@ -276,10 +288,21 @@ const dashboardStacks = stacks.filter(s => s.dashboardWidget);
 
               {/* ── tasks ── */}
               {w.type === 'tasks' && daily?.tasks && (
-                <div class="rounded-xl border border-border bg-card p-5 space-y-3">
+                <div class="relative rounded-xl border border-border bg-card p-5 space-y-3">
+                  {w.config.link && (
+                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
+                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
+                       aria-label={`Open ${w.label}`}>
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                    </a>
+                  )}
                   <div class="flex items-center justify-between">
                     <span class="text-sm font-medium text-foreground">{w.label}</span>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 mr-6">
                       {daily.tasks.dueToday > 0 && (
                         <span class="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
                           {daily.tasks.dueToday} today
@@ -317,7 +340,18 @@ const dashboardStacks = stacks.filter(s => s.dashboardWidget);
 
               {/* ── stat ── */}
               {w.type === 'stat' && daily?.[w.dataKey] != null && (
-                <div class="rounded-xl border border-border bg-card p-5 space-y-1">
+                <div class="relative rounded-xl border border-border bg-card p-5 space-y-1">
+                  {w.config.link && (
+                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
+                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
+                       aria-label={`Open ${w.label}`}>
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                    </a>
+                  )}
                   <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     {w.label}
                   </span>
@@ -332,11 +366,22 @@ const dashboardStacks = stacks.filter(s => s.dashboardWidget);
 
               {/* ── note (card) ── */}
               {w.type === 'note' && w.size === 'card' && w.config.content && (
-                <div class={`rounded-xl border p-5 space-y-1.5 ${
+                <div class={`relative rounded-xl border p-5 space-y-1.5 ${
                   w.config.style === 'warning' ? 'bg-amber-500/10 border-amber-500/40' :
                   w.config.style === 'success'  ? 'bg-emerald-500/10 border-emerald-500/40' :
                   'bg-card border-border'
                 }`}>
+                  {w.config.link && (
+                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
+                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
+                       aria-label={`Open ${w.label}`}>
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                    </a>
+                  )}
                   {w.label && (
                     <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       {w.label}

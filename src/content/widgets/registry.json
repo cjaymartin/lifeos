@@ -11,7 +11,8 @@
       "displayCondition": "mon-to-trash-day",
       "config": {
         "trashDay": "Wednesday",
-        "pickupBy": "7 AM"
+        "pickupBy": "7 AM",
+        "link": "http://www.mattapoisett.gov/238/Trash-Recycling"
       },
       "dataKey": "trash",
       "populator": "populate-daily step-5"
@@ -27,7 +28,8 @@
       "config": {
         "lat": 41.6534,
         "lon": -70.8148,
-        "units": "fahrenheit"
+        "units": "fahrenheit",
+        "link": "https://forecast.weather.gov/MapClick.php?lat=41.6534&lon=-70.8148"
       },
       "dataKey": "weather",
       "populator": "populate-daily step-4"
@@ -42,7 +44,8 @@
       "displayCondition": "has-data",
       "config": {
         "source": "todoist",
-        "maxItems": 5
+        "maxItems": 5,
+        "link": "https://todoist.com/app"
       },
       "dataKey": "tasks",
       "populator": "populate-daily step-2"
