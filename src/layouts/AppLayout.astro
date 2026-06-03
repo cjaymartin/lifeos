@@ -1,6 +1,7 @@
 ---
 import '@/styles/globals.css';
 import Sidebar from '@/components/Sidebar';
+import ChatSidebar from '@/components/ChatSidebar';
 import { stacks } from '@/lib/stacks';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 
 const { title = 'LifeOS' } = Astro.props;
 const currentPath = new URL(Astro.request.url).pathname;
+const currentStack = stacks.find(s => currentPath === s.href || currentPath.startsWith(s.href + '/'));
 ---
 
 <!doctype html>
@@ -33,5 +35,8 @@ const currentPath = new URL(Astro.request.url).pathname;
     <main class="flex-1 overflow-y-auto">
       <slot />
     </main>
+    {currentStack && (
+      <ChatSidebar stackId={currentStack.id} stackLabel={currentStack.label} client:load />
+    )}
   </body>
 </html>
