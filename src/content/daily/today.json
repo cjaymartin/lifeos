@@ -1,6 +1,38 @@
 {
   "date": "2026-06-03",
-  "greeting": "Good morning, CJ.",
-  "briefing": "Your daily briefing will appear here once the morning cron is set up. Each day, Claude will populate this file with a summary tailored to you.",
-  "items": []
+  "greeting": "Good morning, C.Jay.",
+  "briefing": "It's a gorgeous Wednesday in Mattapoisett — 75°F and clear right now, climbing to a high of 76° with no rain in the forecast. Your calendar is wide open today, which is a good thing: you've got 12 overdue tasks stacked up from the past couple weeks, including your daily meds. Worth doing a quick pass.",
+  "weather": {
+    "code": 0,
+    "current": 74.7,
+    "feelsLike": 75.5,
+    "condition": "Clear skies",
+    "high": 76,
+    "low": 46,
+    "wind": 3.6,
+    "precipitation": "None expected"
+  },
+  "tasks": {
+    "dueToday": 0,
+    "overdue": 12,
+    "items": [
+      "Take Fiber & GLP-1 — overdue since May 19",
+      "Sentinel — overdue since May 23",
+      "Call in dog pills — overdue since May 18",
+      "Vacuum Downstairs + Upstairs — overdue since May 25",
+      "RELEASE WRITE UP — overdue since May 18"
+    ]
+  },
+  "calendar": [],
+  "trash": {
+    "today": true,
+    "recycling": true,
+    "note": null
+  },
+  "items": [
+    "Take Fiber & GLP-1 — overdue since May 19",
+    "Sentinel — overdue since May 23",
+    "Put out trash AND recycling this morning",
+    "12 overdue tasks — calendar is clear, good day to chip away"
+  ]
 }

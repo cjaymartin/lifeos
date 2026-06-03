@@ -99,12 +99,16 @@ Write `src/content/daily/today.json`:
 ```json
 {
   "date": "YYYY-MM-DD",
-  "greeting": "Good morning, CJ.",
+  "greeting": "Good morning, C.Jay.",
   "briefing": "<synthesised paragraph>",
   "weather": {
-    "current": "<temp>°F, <condition>",
+    "code": <WMO weather code integer>,
+    "current": <temperature as number>,
+    "feelsLike": <apparent temperature as number>,
+    "condition": "<human-readable condition string>",
     "high": <number>,
     "low": <number>,
+    "wind": <wind speed as number>,
     "precipitation": "<amount or 'None expected'>"
   },
   "tasks": {
