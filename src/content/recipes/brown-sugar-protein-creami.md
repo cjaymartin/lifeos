@@ -7,6 +7,7 @@ prepTime: "5 minutes"
 cookTime: "24 hours freeze"
 tags: ["dessert", "high-protein", "lactose-free", "egg-free", "ninja-creami", "ice-cream"]
 dateAdded: "2026-06-03"
+image: "https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=800&q=80&fit=crop"
 ---
 
 ## Ingredients

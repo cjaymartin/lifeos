@@ -14,6 +14,7 @@ interface Props {
   tags?: string[];
   source?: string;
   sections: RecipeSection[];
+  image?: string;
 }
 
 // ── constants ──────────────────────────────────────────────────────────────
@@ -120,7 +121,7 @@ function renderInline(text: string) {
 
 // ── component ──────────────────────────────────────────────────────────────
 
-export default function RecipeDetail({ title, prepTime, cookTime, servings, tags, source, sections }: Props) {
+export default function RecipeDetail({ title, prepTime, cookTime, servings, tags, source, sections, image }: Props) {
   const [scale, setScale] = useState(1);
   const [metric, setMetric] = useState(false);
 
@@ -149,6 +150,15 @@ export default function RecipeDetail({ title, prepTime, cookTime, servings, tags
 
   return (
     <div className="space-y-8">
+
+      {/* ── Hero Image ─────────────────────────────────────────────────── */}
+      {image && (
+        <img
+          src={image}
+          alt={title}
+          className="w-full h-56 object-cover rounded-xl mb-6"
+        />
+      )}
 
       {/* ── Header (visible in print) ──────────────────────────────────── */}
       <div className="space-y-3">

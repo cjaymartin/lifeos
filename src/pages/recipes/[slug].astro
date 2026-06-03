@@ -1,7 +1,6 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro';
 import RecipeDetail from '@/components/RecipeDetail';
-import RecipeChat from '@/components/RecipeChat';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import type { RecipeSection } from '@/components/RecipeDetail';
@@ -17,6 +16,7 @@ interface RecipeMeta {
   cookTime: string;
   tags: string[];
   dateAdded: string;
+  image?: string;
 }
 
 function parseFrontmatter(raw: string): { data: RecipeMeta; sections: RecipeSection[] } | null {
@@ -77,12 +77,9 @@ if (!recipe) return Astro.redirect('/recipes');
       tags={recipe.tags}
       source={recipe.source}
       sections={sections}
+      image={recipe.image}
       client:load
     />
-
-    <div class="border-t border-border pt-6 print:hidden">
-      <RecipeChat recipeSlug={slug} recipeTitle={recipe.title} client:load />
-    </div>
 
   </div>
 </AppLayout>

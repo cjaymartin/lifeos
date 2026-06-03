@@ -12,6 +12,7 @@ interface Recipe {
   servings: number;
   dateAdded: string;
   source: string;
+  image?: string;
 }
 
 function parseFrontmatter(raw: string): Recipe | null {
@@ -59,24 +60,138 @@ const title = 'Recipes';
     {recipes.length === 0 ? (
       <p class="text-sm text-muted-foreground">No recipes yet.</p>
     ) : (
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {recipes.map(r => (
-          <a href={`/recipes/${r.slug}`}
-             class="group rounded-lg border border-border bg-card p-5 space-y-3 hover:bg-accent/30 transition-colors">
-            <p class="font-medium text-foreground group-hover:text-foreground leading-snug">{r.title}</p>
-            <div class="flex flex-wrap gap-1">
-              {r.tags?.map(tag => (
-                <span class="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{tag}</span>
-              ))}
-            </div>
-            <div class="flex gap-4 text-xs text-muted-foreground">
-              {r.prepTime && <span>Prep: {r.prepTime}</span>}
-              {r.cookTime && <span>Cook: {r.cookTime}</span>}
-              {r.servings && <span>{r.servings} serving{r.servings !== 1 ? 's' : ''}</span>}
-            </div>
-          </a>
-        ))}
-      </div>
+      <>
+        {/* Search and Sort Controls */}
+        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <input
+            id="recipe-search"
+            type="text"
+            placeholder="Search recipes…"
+            class="w-full max-w-sm border border-border bg-card text-foreground rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <div id="sort-controls" class="flex gap-2">
+            <button data-sort="newest" class="sort-btn sort-active text-xs px-3 py-1.5 rounded-md border border-transparent bg-primary text-primary-foreground transition-colors">Newest</button>
+            <button data-sort="az" class="sort-btn text-xs px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">A–Z</button>
+            <button data-sort="oldest" class="sort-btn text-xs px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">Oldest</button>
+          </div>
+        </div>
+
+        {/* Recipe Grid */}
+        <div id="recipe-grid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {recipes.map(r => (
+            <a
+              href={`/recipes/${r.slug}`}
+              class="group rounded-lg border border-border bg-card overflow-hidden hover:bg-accent/30 transition-colors"
+              data-title={r.title.toLowerCase()}
+              data-tags={(r.tags ?? []).join(' ').toLowerCase()}
+              data-date={r.dateAdded}
+            >
+              {r.image ? (
+                <img
+                  src={r.image}
+                  alt={r.title}
+                  class="w-full h-44 object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div class="w-full h-44 bg-muted flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground opacity-40">
+                    <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/>
+                    <line x1="6" x2="18" y1="17" y2="17"/>
+                    <line x1="6" x2="18" y1="13" y2="13"/>
+                  </svg>
+                </div>
+              )}
+              <div class="p-4 space-y-3">
+                <p class="font-medium text-foreground group-hover:text-foreground leading-snug">{r.title}</p>
+                <div class="flex flex-wrap gap-1">
+                  {r.tags?.map(tag => (
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{tag}</span>
+                  ))}
+                </div>
+                <div class="flex gap-4 text-xs text-muted-foreground">
+                  {r.prepTime && <span>Prep: {r.prepTime}</span>}
+                  {r.cookTime && <span>Cook: {r.cookTime}</span>}
+                  {r.servings && <span>{r.servings} serving{r.servings !== 1 ? 's' : ''}</span>}
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+
+        <p id="no-results" class="hidden text-sm text-muted-foreground">No recipes match your search.</p>
+      </>
     )}
   </div>
+
+  <script>
+    (function () {
+      const searchInput = document.getElementById('recipe-search') as HTMLInputElement | null;
+      const grid = document.getElementById('recipe-grid');
+      const noResults = document.getElementById('no-results');
+      const sortBtns = document.querySelectorAll<HTMLButtonElement>('.sort-btn');
+
+      if (!grid) return;
+
+      let currentSort = 'newest';
+      let currentQuery = '';
+
+      function getCards(): HTMLAnchorElement[] {
+        return Array.from(grid!.querySelectorAll<HTMLAnchorElement>('a[data-title]'));
+      }
+
+      function applyFilter() {
+        const q = currentQuery.toLowerCase().trim();
+        let anyVisible = false;
+        for (const card of getCards()) {
+          const titleMatch = (card.dataset.title ?? '').includes(q);
+          const tagsMatch = (card.dataset.tags ?? '').includes(q);
+          const show = q === '' || titleMatch || tagsMatch;
+          card.style.display = show ? '' : 'none';
+          if (show) anyVisible = true;
+        }
+        if (noResults) noResults.classList.toggle('hidden', anyVisible);
+      }
+
+      function applySort() {
+        const cards = getCards();
+        cards.sort((a, b) => {
+          if (currentSort === 'az') {
+            return (a.dataset.title ?? '').localeCompare(b.dataset.title ?? '');
+          } else if (currentSort === 'oldest') {
+            return (a.dataset.date ?? '').localeCompare(b.dataset.date ?? '');
+          } else {
+            // newest
+            return (b.dataset.date ?? '').localeCompare(a.dataset.date ?? '');
+          }
+        });
+        for (const card of cards) grid!.appendChild(card);
+      }
+
+      function updateSortButtons() {
+        for (const btn of sortBtns) {
+          const active = btn.dataset.sort === currentSort;
+          btn.classList.toggle('sort-active', active);
+          btn.classList.toggle('bg-primary', active);
+          btn.classList.toggle('text-primary-foreground', active);
+          btn.classList.toggle('border-transparent', active);
+          btn.classList.toggle('border-border', !active);
+          btn.classList.toggle('text-muted-foreground', !active);
+        }
+      }
+
+      searchInput?.addEventListener('input', () => {
+        currentQuery = searchInput.value;
+        applyFilter();
+      });
+
+      for (const btn of sortBtns) {
+        btn.addEventListener('click', () => {
+          currentSort = btn.dataset.sort ?? 'newest';
+          updateSortButtons();
+          applySort();
+        });
+      }
+    })();
+  </script>
 </AppLayout>
