@@ -1,7 +1,7 @@
 {
   "date": "2026-06-03",
   "greeting": "Good morning, C.Jay.",
-  "briefing": "It's a gorgeous Wednesday in Mattapoisett — 75°F and clear right now, climbing to a high of 76° with no rain in the forecast. Your calendar is wide open today, which is a good thing: you've got 12 overdue tasks stacked up from the past couple weeks, including your daily meds. Worth doing a quick pass.",
+  "briefing": "It's a gorgeous Wednesday in Mattapoisett — 75°F and clear right now, climbing to a high of 76° with no rain in the forecast. Your calendar is wide open today, which is a good thing: you've got 12 overdue tasks stacked up from the past couple weeks, including your daily meds. Worth doing a quick pass. Trash goes out today (recycling week is next week).",
   "weather": {
     "code": 0,
     "current": 74.7,
@@ -26,7 +26,7 @@
   "calendar": [],
   "trash": {
     "today": true,
-    "recycling": true,
+    "recycling": false,
     "note": null
   },
   "items": [

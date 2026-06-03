@@ -155,8 +155,54 @@ const weatherIcon = daily?.weather ? weatherSVG(daily.weather.code) : weatherSVG
         </h1>
       </div>
 
-      {/* ── Top row: Weather + Tasks ─────────────────────────────────────────── */}
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ── Top row: Trash? + Weather + Tasks ───────────────────────────────── */}
+      <div class={`grid grid-cols-1 gap-4 ${showTrashBanner ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+
+        {/* Trash card — first when visible */}
+        {showTrashBanner && daily?.trash && (
+          <div class={`rounded-xl border p-5 flex flex-col justify-between gap-3 ${
+            isTrashDay
+              ? 'bg-amber-500/10 border-amber-500/40'
+              : 'bg-card border-border'
+          }`}>
+            <div class="flex items-start justify-between">
+              <div class="space-y-0.5">
+                <span class={`text-xs font-semibold uppercase tracking-wider ${isTrashDay ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                  {isTrashDay ? 'Today' : 'Coming up'}
+                </span>
+                <p class={`text-base font-semibold ${isTrashDay ? 'text-amber-300' : 'text-foreground'}`}>
+                  {isTrashDay ? 'Trash Day' : 'Trash — Wednesday'}
+                </p>
+              </div>
+              <svg class={`w-8 h-8 shrink-0 ${isTrashDay ? 'text-amber-400' : 'text-muted-foreground/50'}`}
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  isTrashDay ? 'bg-amber-500/20 text-amber-300' : 'bg-muted text-muted-foreground'
+                }`}>Trash</span>
+                {daily.trash.recycling && (
+                  <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    isTrashDay ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground'
+                  }`}>+ Recycling</span>
+                )}
+              </div>
+              {daily.trash.note && (
+                <p class="text-xs text-amber-400/80">{daily.trash.note}</p>
+              )}
+              {isTrashDay && (
+                <p class="text-xs text-muted-foreground">Put out by 7 AM</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Weather */}
         {daily?.weather && (
