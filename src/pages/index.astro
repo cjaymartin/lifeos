@@ -1,6 +1,7 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro';
 import { stacks } from '@/lib/stacks';
+import RefreshButton from '@/components/RefreshButton';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
@@ -185,11 +186,14 @@ const dashboardStacks = stacks.filter(s => s.dashboardWidget);
     <div class="p-6 md:p-10 space-y-6 max-w-5xl mx-auto">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div class="space-y-0.5">
-        <p class="text-sm text-muted-foreground">{dateLabel}</p>
-        <h1 class="text-2xl font-semibold text-foreground">
-          {daily?.greeting ?? 'Good morning.'}
-        </h1>
+      <div class="flex items-start justify-between gap-4">
+        <div class="space-y-0.5">
+          <p class="text-sm text-muted-foreground">{dateLabel}</p>
+          <h1 class="text-2xl font-semibold text-foreground">
+            {daily?.greeting ?? 'Good morning.'}
+          </h1>
+        </div>
+        <RefreshButton client:load />
       </div>
 
       {/* ── Card row ────────────────────────────────────────────────────── */}
