@@ -1,0 +1,88 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro';
+import RecipeDetail from '@/components/RecipeDetail';
+import RecipeChat from '@/components/RecipeChat';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
+import type { RecipeSection } from '@/components/RecipeDetail';
+
+const { slug } = Astro.params;
+
+interface RecipeMeta {
+  title: string;
+  slug: string;
+  source: string;
+  servings: number;
+  prepTime: string;
+  cookTime: string;
+  tags: string[];
+  dateAdded: string;
+}
+
+function parseFrontmatter(raw: string): { data: RecipeMeta; sections: RecipeSection[] } | null {
+  const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!match) return null;
+
+  const data: Record<string, unknown> = {};
+  for (const line of match[1].split('\n')) {
+    const colon = line.indexOf(': ');
+    if (colon === -1) continue;
+    const key = line.slice(0, colon).trim();
+    const val = line.slice(colon + 2).trim();
+    if (val.startsWith('[')) {
+      try { data[key] = JSON.parse(val); } catch { data[key] = []; }
+    } else if (val.startsWith('"') && val.endsWith('"')) {
+      data[key] = val.slice(1, -1);
+    } else if (val !== '' && !isNaN(Number(val))) {
+      data[key] = Number(val);
+    } else {
+      data[key] = val;
+    }
+  }
+
+  const sections: RecipeSection[] = [];
+  for (const part of match[2].split(/^## /m)) {
+    if (!part.trim()) continue;
+    const nl = part.indexOf('\n');
+    if (nl === -1) continue;
+    sections.push({ heading: part.slice(0, nl).trim(), content: part.slice(nl + 1).trim() });
+  }
+
+  return { data: data as unknown as RecipeMeta, sections };
+}
+
+let recipe: RecipeMeta | null = null;
+let sections: RecipeSection[] = [];
+
+try {
+  const raw = await readFile(join(process.cwd(), `src/content/recipes/${slug}.md`), 'utf-8');
+  const parsed = parseFrontmatter(raw);
+  if (parsed) { recipe = parsed.data; sections = parsed.sections; }
+} catch {}
+
+if (!recipe) return Astro.redirect('/recipes');
+---
+<AppLayout title={recipe.title}>
+  <div class="p-6 md:p-10 max-w-3xl mx-auto space-y-10">
+
+    <a href="/recipes" class="text-xs text-muted-foreground hover:text-foreground transition-colors print:hidden">
+      ← Recipes
+    </a>
+
+    <RecipeDetail
+      title={recipe.title}
+      prepTime={recipe.prepTime}
+      cookTime={recipe.cookTime}
+      servings={recipe.servings}
+      tags={recipe.tags}
+      source={recipe.source}
+      sections={sections}
+      client:load
+    />
+
+    <div class="border-t border-border pt-6 print:hidden">
+      <RecipeChat recipeSlug={slug} recipeTitle={recipe.title} client:load />
+    </div>
+
+  </div>
+</AppLayout>

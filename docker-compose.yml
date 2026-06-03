@@ -1,7 +1,12 @@
 services:
   lifeos:
     build: .
+    image: lifeos:latest
+    container_name: lifeos
     restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./src/content:/app/src/content
     expose:
       - "4321"
     networks:

@@ -1,0 +1,233 @@
+/* Google Fonts import moved to globals.css to ensure correct CSS load order */
+
+/* ============================================================================
+   LifeOS — Color & Type Foundations
+   ----------------------------------------------------------------------------
+   Tailwind v4 + OKLCH + shadcn/ui-style semantic tokens.
+   Every color used as text/icon is verified WCAG-AA (>=4.5:1) on its mode's
+   background. See README.md "Visual Foundations" for the contrast table.
+
+   Load order in an Astro/Tailwind v4 app:
+     @import "tailwindcss";
+     @import "./colors_and_type.css";   (this file: :root + .dark + @theme inline)
+   ============================================================================ */
+
+/* Fonts loaded via <link> in AppLayout.astro — see FONTS note in README */
+
+/* ============================================================================
+   1. LIGHT MODE  (:root)
+   ============================================================================ */
+:root {
+  /* ---- Neutral ramp (cool gray, hue ~286) ---- */
+  --background:            oklch(1 0 0);                 /* page            */
+  --foreground:            oklch(0.141 0.005 285.8);     /* ink   21:1      */
+  --card:                  oklch(1 0 0);
+  --card-foreground:       oklch(0.141 0.005 285.8);
+  --popover:               oklch(1 0 0);
+  --popover-foreground:    oklch(0.141 0.005 285.8);
+
+  --muted:                 oklch(0.967 0.001 286.4);     /* subtle fill     */
+  --muted-foreground:      oklch(0.552 0.016 285.9);     /* 4.83:1 ✓        */
+  --secondary:             oklch(0.967 0.001 286.4);
+  --secondary-foreground:  oklch(0.21 0.006 285.9);
+  --accent:                oklch(0.967 0.001 286.4);      /* hover surface  */
+  --accent-foreground:     oklch(0.21 0.006 285.9);
+
+  --border:                oklch(0.92 0.004 286.3);
+  --input:                 oklch(0.92 0.004 286.3);
+  --ring:                  oklch(0.705 0.015 286.1);
+
+  /* ---- Primary (default = near-black; swap via --accent-* below) ---- */
+  --primary:               oklch(0.21 0.006 285.9);
+  --primary-foreground:    oklch(0.985 0 0);
+
+  /* ---- Status: WARNING (the headline fix) ---- */
+  --warning:               oklch(0.55 0.145 58);          /* amber TEXT/icon — 5.07:1 ✓ */
+  --warning-foreground:    oklch(0.985 0.01 75);          /* text ON solid warning fill */
+  --warning-subtle:        oklch(0.97 0.03 75);           /* tinted alert surface       */
+  --warning-border:        oklch(0.88 0.06 72);
+
+  /* ---- Status: SUCCESS ---- */
+  --success:               oklch(0.52 0.13 150);          /* 5.19:1 ✓ */
+  --success-foreground:    oklch(0.985 0.01 150);
+  --success-subtle:        oklch(0.97 0.03 150);
+  --success-border:        oklch(0.88 0.06 150);
+
+  /* ---- Status: DESTRUCTIVE / ERROR ---- */
+  --destructive:           oklch(0.52 0.20 25);           /* 6.12:1 ✓ */
+  --destructive-foreground:oklch(0.985 0.01 25);
+  --destructive-subtle:    oklch(0.97 0.03 25);
+  --destructive-border:    oklch(0.88 0.07 25);
+
+  /* ---- Status: INFO ---- */
+  --info:                  oklch(0.52 0.16 250);          /* 5.47:1 ✓ */
+  --info-foreground:       oklch(0.985 0.01 250);
+  --info-subtle:           oklch(0.97 0.03 250);
+  --info-border:           oklch(0.88 0.06 250);
+
+  /* ---- Optional warm/cool PRIMARY accents (see Tweaks / README) ---- */
+  --accent-terracotta:     oklch(0.56 0.13 40);           /* white text 4.7:1 ✓ */
+  --accent-teal:           oklch(0.55 0.10 200);          /* white text 4.6:1 ✓ */
+
+  /* ---- Radii ---- */
+  --radius:                0.625rem;     /* 10px base */
+  --radius-sm:             calc(var(--radius) - 4px);
+  --radius-md:             calc(var(--radius) - 2px);
+  --radius-lg:             var(--radius);
+  --radius-xl:             calc(var(--radius) + 4px);
+
+  /* ---- Elevation (light) ---- */
+  --shadow-xs:  0 1px 2px 0 oklch(0.141 0.005 285.8 / 0.05);
+  --shadow-sm:  0 1px 3px 0 oklch(0.141 0.005 285.8 / 0.08), 0 1px 2px -1px oklch(0.141 0.005 285.8 / 0.08);
+  --shadow-md:  0 4px 12px -2px oklch(0.141 0.005 285.8 / 0.08), 0 2px 4px -2px oklch(0.141 0.005 285.8 / 0.06);
+  --shadow-lg:  0 12px 28px -6px oklch(0.141 0.005 285.8 / 0.12), 0 4px 8px -4px oklch(0.141 0.005 285.8 / 0.08);
+}
+
+/* ============================================================================
+   2. DARK MODE  (.dark)  — warm status colors stay glowing
+   ============================================================================ */
+.dark {
+  --background:            oklch(0.141 0.005 285.8);
+  --foreground:            oklch(0.985 0 0);
+  --card:                  oklch(0.21 0.006 285.9);
+  --card-foreground:       oklch(0.985 0 0);
+  --popover:               oklch(0.21 0.006 285.9);
+  --popover-foreground:    oklch(0.985 0 0);
+
+  --muted:                 oklch(0.274 0.006 286.0);
+  --muted-foreground:      oklch(0.708 0.014 286.0);      /* 7.65:1 ✓ */
+  --secondary:             oklch(0.274 0.006 286.0);
+  --secondary-foreground:  oklch(0.985 0 0);
+  --accent:                oklch(0.274 0.006 286.0);
+  --accent-foreground:     oklch(0.985 0 0);
+
+  --border:                oklch(1 0 0 / 0.10);
+  --input:                 oklch(1 0 0 / 0.15);
+  --ring:                  oklch(0.552 0.016 285.9);
+
+  --primary:               oklch(0.92 0.004 286.3);
+  --primary-foreground:    oklch(0.21 0.006 285.9);
+
+  /* ---- WARNING — warm glow on dark ---- */
+  --warning:               oklch(0.84 0.15 70);           /* 11.5:1 ✓ */
+  --warning-foreground:    oklch(0.21 0.04 70);
+  --warning-subtle:        oklch(0.45 0.10 65 / 0.18);     /* translucent amber wash */
+  --warning-border:        oklch(0.70 0.12 70 / 0.30);
+
+  /* ---- SUCCESS ---- */
+  --success:               oklch(0.80 0.15 150);          /* 11.3:1 ✓ */
+  --success-foreground:    oklch(0.21 0.04 150);
+  --success-subtle:        oklch(0.45 0.10 150 / 0.18);
+  --success-border:        oklch(0.70 0.12 150 / 0.30);
+
+  /* ---- DESTRUCTIVE ---- */
+  --destructive:           oklch(0.70 0.19 25);           /* 6.84:1 ✓ */
+  --destructive-foreground:oklch(0.20 0.05 25);
+  --destructive-subtle:    oklch(0.45 0.14 25 / 0.20);
+  --destructive-border:    oklch(0.65 0.16 25 / 0.32);
+
+  /* ---- INFO ---- */
+  --info:                  oklch(0.78 0.14 250);          /* 9.81:1 ✓ */
+  --info-foreground:       oklch(0.20 0.05 255);
+  --info-subtle:           oklch(0.45 0.12 250 / 0.20);
+  --info-border:           oklch(0.65 0.13 250 / 0.32);
+
+  --accent-terracotta:     oklch(0.70 0.13 42);
+  --accent-teal:           oklch(0.72 0.10 200);
+
+  /* ---- Elevation (dark): rely on borders + deeper shadow ---- */
+  --shadow-xs:  0 1px 2px 0 oklch(0 0 0 / 0.30);
+  --shadow-sm:  0 1px 3px 0 oklch(0 0 0 / 0.40), 0 1px 2px -1px oklch(0 0 0 / 0.40);
+  --shadow-md:  0 4px 12px -2px oklch(0 0 0 / 0.45), 0 2px 4px -2px oklch(0 0 0 / 0.40);
+  --shadow-lg:  0 12px 28px -6px oklch(0 0 0 / 0.55), 0 4px 8px -4px oklch(0 0 0 / 0.45);
+}
+
+/* ============================================================================
+   3. TAILWIND v4 BRIDGE  — @theme inline maps tokens to utilities
+      Gives you bg-warning, text-warning, border-warning-border, etc.
+   ============================================================================ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-border: var(--warning-border);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-border: var(--success-border);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-border: var(--destructive-border);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-border: var(--info-border);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+}
+
+/* ============================================================================
+   4. TYPE SCALE  —  semantic helpers (work outside Tailwind too)
+      Base body = 14px / 1.5, the shadcn default density.
+   ============================================================================ */
+:root {
+  --font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-body:    'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-code:    'Geist Mono', ui-monospace, monospace;
+
+  --text-display: 700 1.875rem/1.15 var(--font-display);  /* 30px page title  */
+  --text-h1:      600 1.5rem/1.2  var(--font-display);     /* 24px             */
+  --text-h2:      600 1.25rem/1.25 var(--font-display);    /* 20px section     */
+  --text-h3:      600 1.0625rem/1.3 var(--font-display);   /* 17px             */
+  --text-widget:  600 0.875rem/1.2 var(--font-display);    /* 14px widget title*/
+  --text-body:    400 0.875rem/1.5 var(--font-body);       /* 14px             */
+  --text-small:   400 0.8125rem/1.45 var(--font-body);     /* 13px             */
+  --text-caption: 500 0.75rem/1.35 var(--font-body);       /* 12px label       */
+  --text-mono:    400 0.8125rem/1.5 var(--font-code);      /* 13px             */
+
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0em;
+  --tracking-label: 0.04em;   /* uppercase eyebrows */
+}
+
+body { font: var(--text-body); color: var(--foreground); background: var(--background);
+       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+.text-display { font: var(--text-display); letter-spacing: var(--tracking-tight); }
+.text-h1      { font: var(--text-h1);      letter-spacing: var(--tracking-tight); }
+.text-h2      { font: var(--text-h2);      letter-spacing: -0.01em; }
+.text-h3      { font: var(--text-h3); }
+.text-widget  { font: var(--text-widget); }
+.text-body    { font: var(--text-body); }
+.text-small   { font: var(--text-small); }
+.text-caption { font: var(--text-caption); }
+.text-mono    { font: var(--text-mono); }
+.eyebrow      { font: var(--text-caption); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--muted-foreground); }

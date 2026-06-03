@@ -8,13 +8,12 @@ export interface Stack {
 }
 
 export const stacks: Stack[] = [
-  // Add stacks here as they are built. Example:
-  // {
-  //   id: 'recipes',
-  //   label: 'Recipes',
-  //   icon: 'ChefHat',
-  //   href: '/recipes',
-  //   description: 'Saved recipes',
-  //   dashboardWidget: true,
-  // },
+  {
+    id: 'recipes',
+    label: 'Recipes',
+    icon: 'ChefHat',
+    href: '/recipes',
+    description: 'Saved recipes',
+    dashboardWidget: true,
+  },
 ];

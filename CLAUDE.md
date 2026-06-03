@@ -16,3 +16,30 @@ If asked to log a record, save a recipe, or add an entry: **do not write UI code
 
 - Run `npm run build` after changing structural code.
 - Do **not** rebuild when only modifying data files.
+
+## Docker Deployment
+
+LifeOS runs as a Portainer-managed stack on `lifeos.wolfdivided` and `lifeos.localhost` via Traefik.
+
+- **Project compose** (dev + build): `/home/cjay/WebstormProjects/lifeos/docker-compose.yml`
+- **Portainer stack compose** (image-only): `/home/cjay/DockerFiles/lifeos/docker-compose.yml`
+- **Env file**: `/home/cjay/WebstormProjects/lifeos/.env`
+
+### First-time Portainer stack setup
+
+1. Build the image:
+   ```bash
+   cd /home/cjay/WebstormProjects/lifeos
+   docker build -t lifeos:latest .
+   ```
+2. In Portainer → Stacks → Add stack → Upload → select `/home/cjay/DockerFiles/lifeos/docker-compose.yml`, name it `lifeos` → Deploy.
+
+### Updating after code changes
+
+```bash
+cd /home/cjay/WebstormProjects/lifeos
+docker build -t lifeos:latest .
+docker compose -p lifeos up -d
+```
+
+Or after rebuilding, go to Portainer → Stacks → lifeos → Recreate.

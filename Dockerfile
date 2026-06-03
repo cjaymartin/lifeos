@@ -21,6 +21,8 @@ WORKDIR /app
 # Only the compiled output + its own package manifest are needed at runtime
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
+# Content is volume-mounted at runtime; copy here as a baseline fallback
+COPY --from=builder /app/src/content ./src/content
 
 # @astrojs/node standalone build embeds its own dependencies inside dist/
 # but the top-level package.json engine guard still wants node ≥22
