@@ -70,52 +70,19 @@ Only relevant if today is **Wednesday** (or a day that might be a make-up day af
 
 Determine `trashToday: boolean` from this logic.
 
-### 5b — Recycling: read the official schedule PDF
+### 5b — Recycling: read the official Trash & Recycling page
 
-Do **not** guess or use a state/toggle file. The source of truth is the town's official 2026 schedule PDF.
+The town posts explicit weekly announcements directly on this page — it is the authoritative source. Do **not** guess, toggle, or use any local state file.
 
-**Step 1 — Check the fast-path JSON first:**
+WebFetch: `http://www.mattapoisett.gov/238/Trash-Recycling`
 
-Read `src/content/daily/recycling-schedule.json`. If the file exists, its year matches the current year, and today's Wednesday date appears in `recyclingWednesdays`, set `recycling: true`. If the date is NOT in the list, set `recycling: false`.
+Look for news alerts or announcements that reference the current week or the Monday–Sunday window containing today. They will say either:
+- **"Trash Only Week"** → set `recycling: false`
+- **"Recycling Week"** (or similar) → set `recycling: true`
 
-**Step 2 — If the JSON is missing or stale (wrong year):**
+The town pre-posts these for the whole year, so there will always be a matching entry. Find the announcement whose date falls in the current week (Monday–Sunday). If for any reason no announcement is found for the current week, fall back to reading `src/content/daily/recycling-schedule.json` which contains the full extracted 2026 schedule.
 
-Re-derive it from the official PDF:
-
-1. Download the schedule PDF:
-   ```bash
-   curl -sL "http://www.mattapoisett.gov/DocumentCenter/View/2208/2026-Harveys-Curbside-Trash-Recycling-Pick-up-Schedule-for-Mattapoisett-PDF" \
-     -o /tmp/trash-schedule.pdf
-   ```
-   *(For future years, fetch the Trash & Recycling page first to find the new PDF URL:*
-   `http://www.mattapoisett.gov/238/Trash-Recycling`*)*
-
-2. Render to image:
-   ```bash
-   pdftoppm -r 200 /tmp/trash-schedule.pdf /tmp/trash-schedule -png
-   ```
-
-3. Use the `Read` tool on `/tmp/trash-schedule-1.png` to view the calendar with vision.
-
-4. In the rendered image:
-   - The legend reads **"RECYCLING WEEK A (UNSHADED) • RECYCLING WEEK B (SHADED)"**
-   - **Shaded rows = recycling week** (trash + recycling collected)
-   - **Unshaded rows = trash-only**
-   - Look at the current month. Find the row containing this Wednesday. Is that row shaded or unshaded?
-
-5. Extract all recycling Wednesdays for the year by scanning every month. Write a new `src/content/daily/recycling-schedule.json`:
-   ```json
-   {
-     "_source": "<PDF URL>",
-     "_note": "Shaded rows = recycling. Extracted via vision. Regenerate when year changes.",
-     "_year": <year>,
-     "recyclingWednesdays": ["YYYY-MM-DD", ...]
-   }
-   ```
-
-### 5c — Town delay/cancellation check
-
-WebFetch `http://www.mattapoisett.gov/` and look for any current-week news or alerts mentioning trash, recycling, Harvey Waste, DPW, or delays. Set `trashNote` to the notice text if found, otherwise `null`.
+Set `trashNote` to any delay, cancellation, or special notice text found on the page for the current week. If nothing unusual, set it to `null`.
 
 ---
 
