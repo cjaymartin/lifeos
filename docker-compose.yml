@@ -7,6 +7,8 @@ services:
     env_file: .env
     volumes:
       - ./src/content:/app/src/content
+      - /home/cjay/.nvm/versions/node/v25.7.0/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe:/usr/local/bin/claude:ro
+      - /home/cjay/.claude:/root/.claude:ro
     expose:
       - "4321"
     networks:
