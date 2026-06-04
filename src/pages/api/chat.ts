@@ -3,6 +3,7 @@ import { verifySession } from '@/lib/auth';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { spawn } from 'child_process';
+import { stacks, CHAT_BASE_TOOLS } from '@/lib/stacks';
 
 async function loadStackContent(stackId: string): Promise<string> {
   const dir = join(process.cwd(), 'src/content', stackId);
@@ -22,14 +23,14 @@ async function loadStackContent(stackId: string): Promise<string> {
   }
 }
 
-function runClaude(prompt: string): Promise<string> {
+function runClaude(prompt: string, tools: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: string[] = [];
     const proc = spawn(
       'claude',
       [
         '-p', prompt,
-        '--allowedTools', 'Write',
+        '--allowedTools', tools.join(','),
         '--output-format', 'text',
       ],
       {
@@ -46,8 +47,8 @@ function runClaude(prompt: string): Promise<string> {
     });
     proc.on('error', reject);
 
-    // 60-second timeout
-    setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 60_000);
+    // 90s timeout — web searches add latency
+    setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 90_000);
   });
 }
 
@@ -65,23 +66,36 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!stackId) return new Response('Missing stackId', { status: 400 });
   if (!stackLabel) return new Response('Missing stackLabel', { status: 400 });
 
+  // Resolve tools: base set + any stack-specific extras
+  const stack = stacks.find(s => s.id === stackId);
+  const tools = [...new Set([...CHAT_BASE_TOOLS, ...(stack?.chatTools ?? [])])];
+
   const stackContent = await loadStackContent(stackId);
+  const contentDir = join(process.cwd(), 'src/content', stackId);
 
   const historyText = history.slice(0, -1)
     .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
     .join('\n');
 
-  const systemPrompt = `You are the ${stackLabel} assistant for LifeOS, a personal dashboard. You ONLY answer questions about ${stackLabel}. You have access to all ${stackLabel} content below. If asked about anything unrelated to ${stackLabel}, politely say you're scoped to ${stackLabel} only.
+  const systemPrompt = `You are the ${stackLabel} assistant for LifeOS, a personal dashboard. You ONLY answer questions and perform actions related to ${stackLabel}. If asked about anything unrelated to ${stackLabel}, politely say you're scoped to ${stackLabel} only.
 
-Content:
+Capabilities:
+- You can search the web (WebSearch, WebFetch) for information, images, recipes, etc.
+- You can read and write files in: ${contentDir}
+- When writing or updating ${stackLabel} files, use that directory path.
+- Keep responses concise and practical.
+
+Current ${stackLabel} content:
 ${stackContent}`;
 
   const fullPrompt = `${systemPrompt}
 
-${historyText ? `Conversation so far:\n${historyText}\n\n` : ''}User: ${message}`;
+${historyText ? `Conversation so far:\n${historyText}\n\n` : ''}User: ${message}
+
+Today's date: ${new Date().toISOString().slice(0, 10)}`;
 
   try {
-    const reply = await runClaude(fullPrompt);
+    const reply = await runClaude(fullPrompt, tools);
     return new Response(JSON.stringify({ reply }), {
       headers: { 'Content-Type': 'application/json' },
     });
