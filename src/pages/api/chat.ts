@@ -47,8 +47,8 @@ function runClaude(prompt: string, tools: string[]): Promise<string> {
     });
     proc.on('error', reject);
 
-    // 90s timeout — web searches add latency
-    setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 90_000);
+    // 5-minute timeout — web search + multi-file writes can take a while
+    setTimeout(() => { proc.kill(); reject(new Error('timeout after 5 minutes')); }, 300_000);
   });
 }
 

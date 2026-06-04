@@ -25,16 +25,24 @@ export default function ChatSidebar({ stackId, stackLabel }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, loading]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+
+  useEffect(() => {
+    if (!loading) { setElapsed(0); return; }
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [loading]);
 
   async function send() {
     const text = input.trim();
@@ -43,18 +51,27 @@ export default function ChatSidebar({ stackId, stackLabel }: Props) {
     const next: Message[] = [...messages, { role: 'user', content: text }];
     setMessages(next);
     setLoading(true);
+    abortRef.current = new AbortController();
+    const timer = setTimeout(() => abortRef.current?.abort(), 300_000);
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, stackId, stackLabel, history: next.slice(-10) }),
+        signal: abortRef.current.signal,
       });
+      clearTimeout(timer);
       const data = await res.json();
       setMessages(m => [...m, { role: 'assistant', content: data.reply ?? 'Something went wrong.' }]);
-    } catch {
-      setMessages(m => [...m, { role: 'assistant', content: 'Failed to reach the server.' }]);
+    } catch (err) {
+      clearTimeout(timer);
+      const msg = err instanceof Error && err.name === 'AbortError'
+        ? 'Request timed out after 5 minutes.'
+        : 'Failed to reach the server.';
+      setMessages(m => [...m, { role: 'assistant', content: msg }]);
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   }
 
@@ -130,8 +147,11 @@ export default function ChatSidebar({ stackId, stackLabel }: Props) {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-muted rounded-xl px-3.5 py-2.5">
-                <Loader2 size={14} className="text-muted-foreground animate-spin" />
+              <div className="bg-muted rounded-xl px-3.5 py-2.5 flex items-center gap-2">
+                <Loader2 size={14} className="text-muted-foreground animate-spin shrink-0" />
+                <span className="text-xs text-muted-foreground">
+                  {elapsed < 5 ? 'Thinking…' : elapsed < 15 ? 'Working…' : `Working… ${elapsed}s`}
+                </span>
               </div>
             </div>
           )}
