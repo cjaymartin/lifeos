@@ -34,6 +34,10 @@ export const POST: APIRoute = async ({ cookies }) => {
   });
 
   proc.on('exit', async () => { try { await unlink(LOCK); } catch {} });
+  proc.on('error', async (err) => {
+    console.error('[refresh] failed to spawn claude:', err.message);
+    try { await unlink(LOCK); } catch {}
+  });
   proc.unref();
 
   return new Response(JSON.stringify({ status: 'started' }), {

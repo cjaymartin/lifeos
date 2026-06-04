@@ -1,5 +1,5 @@
 # ── build stage ──────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build
 
 # ── production stage ──────────────────────────────────────────────────────────
-FROM node:22-alpine AS runtime
+FROM node:22-slim AS runtime
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
