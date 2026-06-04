@@ -1,10 +1,24 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Loader2, X } from 'lucide-react';
+import { MessageSquare, Send, Loader2, X, Pencil, Check } from 'lucide-react';
 
-interface Message { role: 'user' | 'assistant'; content: string }
+interface Proposal {
+  summary: string;
+  files: { path: string; description: string }[];
+}
 
-interface Props { stackId: string; stackLabel: string }
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  // Present when the assistant is asking permission to make changes
+  proposal?: Proposal;
+  // The assistant's raw reply (incl. the proposal marker) — sent back on approval
+  rawReply?: string;
+  // 'pending' → buttons shown; 'approved'/'declined' → resolved badge
+  proposalStatus?: 'pending' | 'approved' | 'declined';
+}
+
+interface Props { stackId: string; stackLabel: string; currentPath?: string; pageTitle?: string }
 
 const SUGGESTIONS: Record<string, string[]> = {
   recipes: ['What recipes do I have?', 'Add a new recipe', 'Suggest a substitution'],
@@ -20,7 +34,7 @@ function getSuggestions(stackId: string): string[] {
   ];
 }
 
-export default function ChatSidebar({ stackId, stackLabel }: Props) {
+export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitle }: Props) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -44,12 +58,7 @@ export default function ChatSidebar({ stackId, stackLabel }: Props) {
     return () => clearInterval(t);
   }, [loading]);
 
-  async function send() {
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput('');
-    const next: Message[] = [...messages, { role: 'user', content: text }];
-    setMessages(next);
+  async function callChat(message: string, history: Message[], approved: boolean) {
     setLoading(true);
     abortRef.current = new AbortController();
     const timer = setTimeout(() => abortRef.current?.abort(), 300_000);
@@ -57,12 +66,26 @@ export default function ChatSidebar({ stackId, stackLabel }: Props) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, stackId, stackLabel, history: next.slice(-10) }),
+        body: JSON.stringify({
+          message, stackId, stackLabel, currentPath, pageTitle, approved,
+          // Use rawReply for proposal messages so the model sees its own plan
+          history: history.slice(-10).map(m => ({ role: m.role, content: m.rawReply ?? m.content })),
+        }),
         signal: abortRef.current.signal,
       });
       clearTimeout(timer);
       const data = await res.json();
-      setMessages(m => [...m, { role: 'assistant', content: data.reply ?? 'Something went wrong.' }]);
+      if (data.type === 'proposal' && data.proposal) {
+        setMessages(m => [...m, {
+          role: 'assistant',
+          content: data.reply || data.proposal.summary,
+          proposal: data.proposal,
+          rawReply: data.rawReply,
+          proposalStatus: 'pending',
+        }]);
+      } else {
+        setMessages(m => [...m, { role: 'assistant', content: data.reply ?? 'Something went wrong.' }]);
+      }
     } catch (err) {
       clearTimeout(timer);
       const msg = err instanceof Error && err.name === 'AbortError'
@@ -73,6 +96,33 @@ export default function ChatSidebar({ stackId, stackLabel }: Props) {
       setLoading(false);
       abortRef.current = null;
     }
+  }
+
+  async function send() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput('');
+    const next: Message[] = [...messages, { role: 'user', content: text }];
+    setMessages(next);
+    await callChat(text, next, false);
+  }
+
+  async function approve(index: number) {
+    if (loading) return;
+    setMessages(m => m.map((msg, i) => i === index ? { ...msg, proposalStatus: 'approved' as const } : msg));
+    const history = messages.slice(0, index + 1);
+    await callChat(
+      'I approve — please go ahead and make those changes now.',
+      [...history, { role: 'user', content: 'I approve — please go ahead and make those changes now.' }],
+      true
+    );
+  }
+
+  function decline(index: number) {
+    setMessages(m => [
+      ...m.map((msg, i) => i === index ? { ...msg, proposalStatus: 'declined' as const } : msg),
+      { role: 'assistant', content: 'No problem — I won\'t make any changes. Let me know if you\'d like something different.' },
+    ]);
   }
 
   function onKey(e: React.KeyboardEvent) {
@@ -141,6 +191,47 @@ export default function ChatSidebar({ stackId, stackLabel }: Props) {
                   : 'bg-muted text-foreground'
               }`}>
                 {m.content}
+                {m.proposal && (
+                  <div className="mt-3 rounded-lg border border-border bg-card p-3 space-y-2 whitespace-normal">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                      <Pencil size={12} className="text-muted-foreground shrink-0" />
+                      Changes I&apos;d like to make
+                    </div>
+                    <ul className="space-y-1">
+                      {m.proposal.files.map((f, fi) => (
+                        <li key={fi} className="text-xs text-muted-foreground leading-relaxed">
+                          • {f.description}
+                        </li>
+                      ))}
+                    </ul>
+                    {m.proposalStatus === 'pending' && (
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => approve(i)}
+                          disabled={loading}
+                          className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
+                        >
+                          <Check size={12} /> Approve
+                        </button>
+                        <button
+                          onClick={() => decline(i)}
+                          disabled={loading}
+                          className="text-xs px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+                        >
+                          Not now
+                        </button>
+                      </div>
+                    )}
+                    {m.proposalStatus === 'approved' && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
+                        <Check size={12} /> Approved
+                      </div>
+                    )}
+                    {m.proposalStatus === 'declined' && (
+                      <div className="text-xs text-muted-foreground pt-1">Dismissed</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

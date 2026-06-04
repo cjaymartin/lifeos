@@ -2,6 +2,10 @@
 import AppLayout from '@/layouts/AppLayout.astro';
 import { stacks } from '@/lib/stacks';
 import RefreshButton from '@/components/RefreshButton';
+import TasksWidget from '@/components/tasks/TasksWidget';
+import { getSnapshot } from '@/lib/tasks/store';
+import { ensureSyncLoop, getSyncStatus } from '@/lib/tasks/sync-loop';
+import { loadDeliveries } from '@/lib/deliveries';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
@@ -47,6 +51,10 @@ try {
   daily = JSON.parse(raw);
 } catch {}
 
+// Load deliveries (own file + own sync lifecycle — not part of today.json)
+const deliveriesData = await loadDeliveries();
+const deliveries = deliveriesData?.deliveries ?? [];
+
 // Date helpers
 const now = new Date();
 const dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -63,6 +71,7 @@ function shouldShow(w: WidgetDef): boolean {
       return Array.isArray(d) && d.length > 0;
     }
     case 'has-data': return !!daily?.[w.dataKey];
+    case 'has-deliveries': return deliveries.length > 0;
     default: return true;
   }
 }
@@ -79,6 +88,19 @@ const fullWidgets  = visibleWidgets.filter(w => w.size === 'full');
 const trashWidget = visibleWidgets.find(w => w.type === 'trash');
 const showTrashBanner = !!trashWidget && !!daily?.trash;
 const isTrashDay = dayOfWeek === 3;
+
+// Deliveries widget — today-focused summary
+const toISODate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const todayISO = toISODate(now);
+const tomorrowISO = toISODate(new Date(now.getTime() + 86_400_000));
+const inFlight = deliveries.filter(d => d.status !== 'delivered');
+const arrivingToday = inFlight.filter(d => d.eta === todayISO || d.status === 'out-for-delivery');
+const arrivingTomorrow = inFlight.filter(d => d.eta === tomorrowISO && !arrivingToday.includes(d));
+const deliveredRecently = deliveries.filter(d => d.status === 'delivered');
+const deliveriesHeadline =
+  arrivingToday.length > 0 ? `${arrivingToday.length} arriving today`
+  : inFlight.length > 0 ? `${inFlight.length} in transit`
+  : `${deliveredRecently.length} delivered`;
 
 // Grid class based on visible card count
 const gridCols = cardWidgets.length <= 1 ? 'md:grid-cols-1'
@@ -152,6 +174,10 @@ function weatherSVG(code: number): string {
 
 const weatherIcon = daily?.weather ? weatherSVG(daily.weather.code) : null;
 const dashboardStacks = stacks.filter(s => s.dashboardWidget);
+
+// Live tasks mirror — initial data for the Tasks widget island (kept fresh via SSE)
+ensureSyncLoop();
+const tasksInitial = { ...(await getSnapshot()), sync: getSyncStatus() };
 ---
 
 <AppLayout title="Dashboard">
@@ -290,56 +316,51 @@ const dashboardStacks = stacks.filter(s => s.dashboardWidget);
                 </div>
               )}
 
-              {/* ── tasks ── */}
-              {w.type === 'tasks' && daily?.tasks && (
-                <div class="relative rounded-xl border border-border bg-card p-5 space-y-3">
-                  {w.config.link && (
-                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
-                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
-                       aria-label={`Open ${w.label}`}>
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/>
-                        <line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                    </a>
-                  )}
-                  <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-foreground">{w.label}</span>
-                    <div class="flex gap-2 mr-6">
-                      {daily.tasks.dueToday > 0 && (
-                        <span class="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
-                          {daily.tasks.dueToday} today
-                        </span>
-                      )}
-                      {daily.tasks.overdue > 0 && (
-                        <span class="text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive font-medium">
-                          {daily.tasks.overdue} overdue
-                        </span>
-                      )}
-                      {daily.tasks.dueToday === 0 && daily.tasks.overdue === 0 && (
-                        <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 font-medium">
-                          All clear
-                        </span>
-                      )}
-                    </div>
+              {/* ── deliveries — today-focused summary from deliveries.json ── */}
+              {w.type === 'deliveries' && deliveries.length > 0 && (
+                <div class="relative rounded-xl border border-border bg-card p-5 flex flex-col gap-3">
+                  <a href={String(w.config.link ?? '/deliveries')}
+                     class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
+                     aria-label="Open Deliveries">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </a>
+                  <div class="space-y-0.5">
+                    <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {w.label}
+                    </span>
+                    <p class={`text-base font-semibold ${arrivingToday.length > 0 ? 'text-warning' : 'text-foreground'}`}>
+                      {deliveriesHeadline}
+                    </p>
                   </div>
-                  {daily.tasks.items.length > 0 && (
+                  {(arrivingToday.length > 0 || arrivingTomorrow.length > 0) && (
                     <ul class="space-y-1.5">
-                      {daily.tasks.items.slice(0, Number(w.config.maxItems ?? 5)).map(item => (
-                        <li class="flex items-start gap-2 text-xs text-muted-foreground">
-                          <span class="mt-1 h-1.5 w-1.5 rounded-full bg-destructive/60 shrink-0"/>
-                          {item}
+                      {[...arrivingToday, ...arrivingTomorrow].slice(0, Number(w.config.maxItems ?? 4)).map(d => (
+                        <li class="flex items-center gap-2 min-w-0">
+                          <span class={`text-xs font-medium shrink-0 ${arrivingToday.includes(d) ? 'text-warning' : 'text-muted-foreground'}`}>
+                            {arrivingToday.includes(d) ? 'Today' : 'Tomorrow'}
+                          </span>
+                          <span class="text-xs text-muted-foreground truncate">
+                            {d.vendor} — {d.item}
+                          </span>
                         </li>
                       ))}
-                      {daily.tasks.items.length > Number(w.config.maxItems ?? 5) && (
-                        <li class="text-xs text-muted-foreground/60 pl-3.5">
-                          +{daily.tasks.items.length - Number(w.config.maxItems ?? 5)} more
-                        </li>
-                      )}
                     </ul>
                   )}
+                  {arrivingToday.length === 0 && arrivingTomorrow.length === 0 && inFlight.length > 0 && (
+                    <p class="text-xs text-muted-foreground">
+                      Next: {inFlight.find(d => d.eta)?.vendor ?? inFlight[0].vendor} — {inFlight.find(d => d.eta)?.eta ?? 'ETA unknown'}
+                    </p>
+                  )}
                 </div>
+              )}
+
+              {/* ── tasks — live mirror, near-real-time via SSE ── */}
+              {w.type === 'tasks' && (
+                <TasksWidget client:load initial={tasksInitial} maxItems={Number(w.config.maxItems ?? 5)} />
               )}
 
               {/* ── stat ── */}

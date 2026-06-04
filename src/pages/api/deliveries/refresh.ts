@@ -1,12 +1,12 @@
 import type { APIRoute } from 'astro';
 import { verifySession } from '@/lib/auth';
-import { spawnPopulateDaily } from '@/lib/populate-daily-runner';
+import { spawnPopulateDeliveries } from '@/lib/populate-deliveries-runner';
 
 export const POST: APIRoute = async ({ cookies }) => {
   if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
     return new Response('Unauthorized', { status: 401 });
 
-  const status = await spawnPopulateDaily();
+  const status = await spawnPopulateDeliveries();
   return new Response(JSON.stringify({ status }), {
     status: 202, headers: { 'Content-Type': 'application/json' },
   });

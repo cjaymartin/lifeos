@@ -16,12 +16,30 @@ export const CHAT_BASE_TOOLS = ['WebSearch', 'WebFetch', 'Read', 'Write'];
 
 export const stacks: Stack[] = [
   {
+    id: 'tasks',
+    label: 'Tasks',
+    icon: 'ListChecks',
+    href: '/tasks',
+    description: 'Live Todoist tasks',
+    dashboardWidget: false, // the dashboard already has a dedicated live Tasks widget
+    chatTools: [],
+  },
+  {
+    id: 'deliveries',
+    label: 'Deliveries',
+    icon: 'Package',
+    href: '/deliveries',
+    description: 'Upcoming deliveries from Gmail',
+    dashboardWidget: false, // the dashboard has a dedicated Deliveries widget (registry.json)
+    chatTools: [],
+  },
+  {
     id: 'recipes',
     label: 'Recipes',
     icon: 'ChefHat',
     href: '/recipes',
     description: 'Saved recipes',
-    dashboardWidget: true,
+    dashboardWidget: false, // sidebar only — no dashboard card
     // Recipes chat can search the web for images/inspiration and read/write recipe files
     chatTools: [],
   },

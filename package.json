@@ -9,7 +9,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "populate-daily": "node --experimental-strip-types scripts/populate-daily.ts"
   },
   "dependencies": {
     "@astrojs/node": "^10.1.3",

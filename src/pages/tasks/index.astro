@@ -1,0 +1,14 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro';
+import TasksApp from '@/components/tasks/TasksApp';
+import { getSnapshot } from '@/lib/tasks/store';
+import { ensureSyncLoop, getSyncStatus } from '@/lib/tasks/sync-loop';
+
+ensureSyncLoop();
+const snapshot = await getSnapshot();
+const initial = { ...snapshot, sync: getSyncStatus() };
+---
+
+<AppLayout title="Tasks">
+  <TasksApp client:load initial={initial} />
+</AppLayout>

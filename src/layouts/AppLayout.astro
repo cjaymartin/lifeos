@@ -36,7 +36,7 @@ const currentStack = stacks.find(s => currentPath === s.href || currentPath.star
       <slot />
     </main>
     {currentStack && (
-      <ChatSidebar stackId={currentStack.id} stackLabel={currentStack.label} client:load />
+      <ChatSidebar stackId={currentStack.id} stackLabel={currentStack.label} currentPath={currentPath} pageTitle={title} client:load />
     )}
   </body>
 </html>

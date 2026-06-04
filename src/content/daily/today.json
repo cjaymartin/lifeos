@@ -1,38 +1,36 @@
 {
-  "date": "2026-06-03",
+  "date": "2026-06-04",
   "greeting": "Good morning, C.Jay.",
-  "briefing": "It's a gorgeous Wednesday in Mattapoisett — 75°F and clear right now, climbing to a high of 76° with no rain in the forecast. Your calendar is wide open today, which is a good thing: you've got 12 overdue tasks stacked up from the past couple weeks, including your daily meds. Worth doing a quick pass. Trash goes out today (recycling week is next week).",
+  "briefing": "It's a stunning sunny Thursday in Mattapoisett — currently 67° and heading for a high of 80°F. Southwest winds at 7–16 mph with gusts up to 26 mph this afternoon, but no rain in sight. Your calendar is clear, so the day is yours. Just 3 daily habits on the task list — a good day to get outside.",
   "weather": {
     "code": 0,
-    "current": 74.7,
-    "feelsLike": 75.5,
-    "condition": "Clear skies",
-    "high": 76,
-    "low": 46,
-    "wind": 3.6,
+    "current": 67,
+    "feelsLike": 67,
+    "condition": "Sunny",
+    "high": 80,
+    "low": 53,
+    "wind": 16,
     "precipitation": "None expected"
   },
   "tasks": {
-    "dueToday": 0,
-    "overdue": 12,
+    "dueToday": 3,
+    "overdue": 0,
     "items": [
-      "Take Fiber & GLP-1 — overdue since May 19",
-      "Sentinel — overdue since May 23",
-      "Call in dog pills — overdue since May 18",
-      "Vacuum Downstairs + Upstairs — overdue since May 25",
-      "RELEASE WRITE UP — overdue since May 18"
+      "Take Fiber",
+      "Brush Teeth Morning",
+      "Brush Teeth Evening"
     ]
   },
   "calendar": [],
   "trash": {
-    "today": true,
+    "today": false,
     "recycling": false,
     "note": null
   },
   "items": [
-    "Take Fiber & GLP-1 — overdue since May 19",
-    "Sentinel — overdue since May 23",
-    "Put out trash AND recycling this morning",
-    "12 overdue tasks — calendar is clear, good day to chip away"
+    "Take Fiber (p1)",
+    "Brush Teeth — morning",
+    "Brush Teeth — evening at 7 PM",
+    "No meetings — open day, consider getting outside"
   ]
 }

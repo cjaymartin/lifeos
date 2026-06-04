@@ -1,0 +1,11 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro';
+import DeliveriesApp from '@/components/deliveries/DeliveriesApp';
+import { loadDeliveries } from '@/lib/deliveries';
+
+const initial = await loadDeliveries();
+---
+
+<AppLayout title="Deliveries">
+  <DeliveriesApp client:load initial={initial} />
+</AppLayout>

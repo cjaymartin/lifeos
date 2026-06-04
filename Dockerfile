@@ -23,6 +23,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 # Content is volume-mounted at runtime; copy here as a baseline fallback
 COPY --from=builder /app/src/content ./src/content
+# Project skills (populate-daily, populate-deliveries) — required by the
+# headless `claude -p /<skill>` spawns from the refresh endpoints.
+COPY --from=builder /app/.claude ./.claude
 
 # @astrojs/node standalone build embeds its own dependencies inside dist/
 # but the top-level package.json engine guard still wants node ≥22

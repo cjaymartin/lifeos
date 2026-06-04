@@ -1,6 +1,6 @@
 ---
 name: populate-daily
-description: Generate today's morning briefing — pulls Todoist tasks, Google Calendar events, weather for Mattapoisett MA, and Wednesday trash status, then writes src/content/daily/today.json.
+description: Generate today's morning briefing — reads the local tasks mirror, pulls Google Calendar events, weather for Mattapoisett MA, and Wednesday trash status, then writes src/content/daily/today.json.
 ---
 
 # Populate Daily Briefing
@@ -19,10 +19,12 @@ Gather data from all sources, synthesise a brief, and write `src/content/daily/t
 
 Read `src/content/widgets/registry.json`. Note which widgets are enabled and their `populator` field. Only collect data for widgets that are enabled. Steps below map to populators:
 
-- Step 2 (Todoist tasks) → needed if any widget has `"populator": "populate-daily step-2"`
+- Step 2 (Tasks) → always run; it reads the local mirror (cheap) and feeds the briefing.
+  The dashboard Tasks widget no longer uses this data — it syncs live via the Tasks stack.
 - Step 3 (Google Calendar) → needed if any widget has `"populator": "populate-daily step-3"`
 - Step 4 (Weather) → needed if any widget has `"populator": "populate-daily step-4"`
 - Step 5 (Trash) → needed if any widget has `"populator": "populate-daily step-5"`
+- Step 5.5 (Deliveries) → needed if any enabled widget's `populator` mentions `populate-deliveries`
 
 If the registry file doesn't exist or can't be read, run all steps (safe default).
 
@@ -37,14 +39,21 @@ Use `currentDate` from context or run `date` in bash. Format: YYYY-MM-DD. Also d
 
 ---
 
-## Step 2 — Todoist tasks
+## Step 2 — Tasks (from the local mirror — do NOT call Todoist MCP tools)
 
-Use `mcp__claude_ai_Todoist__find-tasks-by-date` to get tasks due today.
-Also use `mcp__claude_ai_Todoist__find-tasks` with a filter for overdue tasks.
+Tasks now sync continuously into a local mirror maintained by the Tasks stack
+(`src/lib/tasks/`). Read `src/content/tasks/tasks.json` instead of calling any
+Todoist tools. Each task has `content`, `projectId`, `priority` (1 = highest),
+and `due.date` (YYYY-MM-DD, may include a T…time part). Project names are in the
+`projects` array.
 
-Collect:
+Collect (comparing `due.date`'s date part against today):
 - Tasks due today (with project names)
-- Overdue tasks (count + list, capped at 5)
+- Overdue tasks: `due.date` before today (count + list, capped at 5)
+
+If the mirror file is missing or empty (sync not configured yet), set the tasks
+block to `{"dueToday": 0, "overdue": 0, "items": []}` and skip task mentions in
+the briefing.
 
 ---
 
@@ -99,6 +108,16 @@ Set `trashNote` to any delay, cancellation, or special notice text found on the 
 
 ---
 
+## Step 5.5 — Deliveries (delegated skill)
+
+Read `.claude/skills/populate-deliveries/SKILL.md` and follow it exactly — it scans
+Gmail for upcoming deliveries and writes `src/content/deliveries/deliveries.json`
+(a separate file from today.json, with its own refresh button on /deliveries).
+
+After it completes, note anything arriving **today** for the briefing.
+
+---
+
 ## Step 6 — Synthesise briefing
 
 Write a short, natural-language briefing paragraph (2-5 sentences). Tone: warm, personal, informative. Address the user directly. Include:
@@ -106,6 +125,7 @@ Write a short, natural-language briefing paragraph (2-5 sentences). Tone: warm, 
 - How many tasks due / overdue flag if any
 - Any calendar events today
 - Trash reminder if applicable
+- Deliveries arriving today, if any (e.g. "Your Chewy order lands today")
 
 Example:
 > "Good morning! It's a chilly 38° morning in Mattapoisett with clear skies — high of 52° today. You have 3 tasks due, including 2 overdue items worth clearing out. Don't forget trash (and recycling) goes out today."
@@ -156,5 +176,5 @@ Write `src/content/daily/today.json`:
 
 To run this every morning at 6:30am, add to crontab:
 ```
-30 6 * * * cd /home/cjay/WebstormProjects/lifeos && claude -p "/populate-daily" --allowedTools "mcp__claude_ai_Todoist__*,mcp__claude_ai_Google_Calendar__*,WebFetch,Bash,Read,Write"
+30 6 * * * cd /home/cjay/WebstormProjects/lifeos && claude -p "/populate-daily" --allowedTools "mcp__claude_ai_Google_Calendar__*,mcp__claude_ai_Gmail__search_threads,mcp__claude_ai_Gmail__get_thread,WebFetch,Bash,Read,Write"
 ```

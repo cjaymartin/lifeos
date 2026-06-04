@@ -35,20 +35,35 @@
       "populator": "populate-daily step-4"
     },
     {
+      "id": "deliveries",
+      "type": "deliveries",
+      "label": "Deliveries",
+      "enabled": true,
+      "order": 25,
+      "size": "card",
+      "displayCondition": "has-deliveries",
+      "config": {
+        "maxItems": 4,
+        "link": "/deliveries"
+      },
+      "dataKey": "deliveries",
+      "populator": "populate-deliveries (also invoked by populate-daily step-5.5)"
+    },
+    {
       "id": "tasks",
       "type": "tasks",
       "label": "Tasks",
       "enabled": true,
       "order": 30,
       "size": "card",
-      "displayCondition": "has-data",
+      "displayCondition": "always",
       "config": {
         "source": "todoist",
         "maxItems": 5,
-        "link": "https://todoist.com/app"
+        "link": "/tasks"
       },
       "dataKey": "tasks",
-      "populator": "populate-daily step-2"
+      "populator": "live sync — src/lib/tasks (Tasks stack)"
     },
     {
       "id": "calendar",
