@@ -31,6 +31,11 @@ COPY --from=builder /app/.claude ./.claude
 # but the top-level package.json engine guard still wants node ≥22
 RUN npm install --omit=dev --ignore-scripts 2>/dev/null || true
 
+# Real Chrome for the persistent retailer sessions (Settings > Logins).
+# Falls back to bundled Chromium if the Chrome channel install fails.
+RUN npx playwright install --with-deps chrome || \
+    npx playwright install --with-deps chromium
+
 EXPOSE 4321
 
 CMD ["node", "./dist/server/entry.mjs"]
@@ -47,9 +52,14 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=4321
 
-# procps gives nodemon `ps` for reliable child-process-tree kills on restart
-RUN apt-get update && apt-get install -y --no-install-recommends procps \
-  && rm -rf /var/lib/apt/lists/*
+# procps gives nodemon `ps` for reliable child-process-tree kills on restart.
+# Google Chrome backs the persistent retailer sessions (Settings > Logins) —
+# installed at the image level since playwright (npm ci'd at runtime into the
+# named volume) only drives it, it doesn't ship it.
+RUN apt-get update && apt-get install -y --no-install-recommends procps wget gnupg ca-certificates \
+  && wget -qO /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+  && apt-get install -y --no-install-recommends /tmp/chrome.deb \
+  && rm /tmp/chrome.deb && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 RUN chown node:node /app

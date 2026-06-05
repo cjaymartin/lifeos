@@ -8,6 +8,7 @@ import type {
   TaskProvider,
 } from './provider';
 import { ProviderError } from './provider';
+import { getAccountSecrets } from '../settings/secrets';
 import type { CompletedTask, Label, Project, Section, Task, TaskDue } from './types';
 
 const API = 'https://api.todoist.com/api/v1';
@@ -319,6 +320,12 @@ export class TodoistProvider implements TaskProvider {
 
 /** Resolve the configured provider, or null when no token is set yet. */
 export function getTodoistToken(): string | null {
+  // A token saved via Settings > Logins (encrypted store) wins over the env
+  // var, so updating it in the UI takes effect without a container restart.
+  try {
+    const stored = getAccountSecrets('todoist').token ?? '';
+    if (stored.trim()) return stored.trim();
+  } catch {}
   const token =
     (import.meta as any).env?.TODOIST_API_TOKEN ?? process.env.TODOIST_API_TOKEN ?? '';
   return token.trim() ? token.trim() : null;
