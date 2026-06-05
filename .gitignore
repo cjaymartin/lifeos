@@ -25,3 +25,9 @@ pnpm-debug.log*
 
 # WebAuthn passkey data (instance-specific)
 data/
+
+# Settings > Logins — encrypted secrets, retailer Chrome profiles, job scratch
+src/content/settings/secrets.json.enc
+src/content/settings/.profiles/
+src/content/settings/.job-*
+src/content/settings/.probe-*

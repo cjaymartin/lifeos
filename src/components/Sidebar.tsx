@@ -4,6 +4,7 @@ import {
   ChevronRight,
   ChevronLeft,
   LogOut,
+  Settings,
   Sun,
   Moon,
   type LucideIcon,
@@ -142,6 +143,36 @@ export default function Sidebar({ stacks, currentPath }: Props) {
 
         {/* Bottom controls */}
         <div className="p-2 space-y-0.5">
+          {/* Settings */}
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href="/settings/logins"
+                  className={cn(
+                    'flex w-full items-center justify-center rounded-md p-2 transition-colors hover:bg-accent hover:text-foreground',
+                    currentPath.startsWith('/settings') ? 'bg-accent text-foreground' : 'text-muted-foreground',
+                  )}
+                  aria-label="Settings"
+                >
+                  <Settings size={16} />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent side="right">Settings</TooltipContent>
+            </Tooltip>
+          ) : (
+            <a
+              href="/settings/logins"
+              className={cn(
+                'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors hover:bg-accent hover:text-foreground',
+                currentPath.startsWith('/settings') ? 'bg-accent text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              <Settings size={16} className="shrink-0" />
+              <span>Settings</span>
+            </a>
+          )}
+
           {/* Theme toggle */}
           {collapsed ? (
             <Tooltip>

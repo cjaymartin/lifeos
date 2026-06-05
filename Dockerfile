@@ -31,6 +31,11 @@ COPY --from=builder /app/.claude ./.claude
 # but the top-level package.json engine guard still wants node ≥22
 RUN npm install --omit=dev --ignore-scripts 2>/dev/null || true
 
+# Real Chrome for the persistent retailer sessions (Settings > Logins).
+# Falls back to bundled Chromium if the Chrome channel install fails.
+RUN npx playwright install --with-deps chrome || \
+    npx playwright install --with-deps chromium
+
 EXPOSE 4321
 
 CMD ["node", "./dist/server/entry.mjs"]
