@@ -58,15 +58,18 @@ function runClaude(prompt: string, tools: string[]): Promise<string> {
     const proc = spawn(
       'claude',
       ['-p', prompt, '--allowedTools', tools.join(','), '--output-format', 'text'],
-      { cwd: process.cwd(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } }
+      // detached → own process group: claude's exit-time cleanup signals can
+      // never reach the server (an attached claude SIGTERM'd the whole app)
+      { cwd: process.cwd(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env }, detached: true }
     );
     proc.stdout.on('data', (d: Buffer) => chunks.push(d.toString()));
+    const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout after 5 minutes')); }, 300_000);
     proc.on('close', code => {
+      clearTimeout(timer);
       if (code === 0 || chunks.length > 0) resolve(chunks.join('').trim());
       else reject(new Error(`claude exited with code ${code}`));
     });
-    proc.on('error', reject);
-    setTimeout(() => { proc.kill(); reject(new Error('timeout after 5 minutes')); }, 300_000);
+    proc.on('error', err => { clearTimeout(timer); reject(err); });
   });
 }
 
@@ -92,7 +95,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const stack = stacks.find(s => s.id === stackId);
   const allTools = [...new Set([...CHAT_BASE_TOOLS, ...(stack?.chatTools ?? [])])];
   // Phase 1: no writes — Claude proposes first. Phase 2: all tools after user approval.
-  const tools = approved ? allTools : allTools.filter(t => t !== 'Write');
+  const tools = approved ? allTools : allTools.filter(t => t !== 'Write' && t !== 'Edit');
 
   const stackContent = await loadStackContent(stackId);
   const contentDir = join(process.cwd(), 'src/content', stackId);
@@ -106,7 +109,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     : '';
 
   const writeGuidance = approved
-    ? `The user has reviewed and approved the proposed changes. Execute all file writes now — do not ask for further confirmation.`
+    ? `The user has reviewed and approved the proposed changes. Execute all file writes now (Write or Edit) — do not ask for further confirmation.
+CRITICAL — report honestly: if any Write/Edit tool call errors or is permission-denied, tell the user plainly that the change did NOT happen and which file failed. NEVER describe a change as done unless the tool call actually succeeded.`
     : `IMPORTANT — file write flow:
 If you need to create or modify files, do NOT write them yet.
 Instead: explain what you'd like to do in plain, friendly language (no file paths or technical jargon for the user), then end your message with exactly this on its own line:
@@ -122,7 +126,7 @@ ${approved ? `- Write files in: ${contentDir}` : '- File writes require user app
 - Keep responses concise and friendly.
 
 ${writeGuidance}
-
+${stack?.chatGuidance ? `\nStack-specific guidance:\n${stack.chatGuidance}\n` : ''}
 Current ${stackLabel} content:
 ${stackContent}`;
 

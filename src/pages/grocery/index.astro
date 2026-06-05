@@ -1,0 +1,11 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro';
+import GroceryApp from '@/components/grocery/GroceryApp';
+import { loadGroceryState } from '@/lib/grocery';
+
+const initial = await loadGroceryState();
+---
+
+<AppLayout title="Groceries">
+  <GroceryApp client:load initial={initial} />
+</AppLayout>

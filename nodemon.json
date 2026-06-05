@@ -1,0 +1,17 @@
+{
+  "watch": [
+    "src",
+    "public",
+    "scripts",
+    "astro.config.mjs",
+    "tsconfig.json",
+    "components.json",
+    "package.json",
+    "package-lock.json"
+  ],
+  "ignore": ["src/content/**"],
+  "ext": "ts,tsx,astro,mjs,cjs,js,css,json,md,svg,sh",
+  "delay": 1500,
+  "signal": "SIGTERM",
+  "exec": "sh scripts/build-and-serve.sh"
+}

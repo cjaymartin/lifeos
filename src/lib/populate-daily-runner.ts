@@ -1,8 +1,11 @@
 import { spawn } from 'child_process';
+import { openSync } from 'fs';
 import { writeFile, unlink, readFile } from 'fs/promises';
 import { join } from 'path';
 
 const LOCK = join(process.cwd(), 'src/content/daily/.refresh-lock');
+// claude output lands here (bind-mounted) so failed runs are debuggable from the host
+const LOG = join(process.cwd(), 'src/content/daily/.refresh-log');
 const STALE_MS = 5 * 60 * 1000;
 
 const ALLOWED_TOOLS = [
@@ -20,9 +23,8 @@ const ALLOWED_TOOLS = [
   'Write(src/content/deliveries/deliveries.json)',
 ].join(' ');
 
-// No bypassPermissions: the container runs claude as root, which rejects
-// bypass mode. acceptEdits auto-approves file writes; --allowedTools covers
-// the MCP/read tools (verified working headless in the container).
+// acceptEdits auto-approves file writes; --allowedTools covers the MCP/read
+// tools (verified working headless in the container, which runs as uid 1000).
 const CLAUDE_ARGS = [
   '-p', '/populate-daily',
   '--permission-mode', 'acceptEdits',
@@ -46,10 +48,13 @@ async function releaseLock() {
 export async function spawnPopulateDaily(): Promise<'started' | 'running'> {
   if (!(await acquireLock())) return 'running';
 
+  let out: number | 'ignore' = 'ignore';
+  try { out = openSync(LOG, 'w'); } catch {}
+
   const proc = spawn('claude', CLAUDE_ARGS, {
     cwd: process.cwd(),
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', out, out],
     env: { ...process.env },
   });
 

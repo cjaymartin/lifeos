@@ -1,0 +1,65 @@
+{
+  "purchases": [
+    {
+      "date": "2026-06-05",
+      "name": "cream cheese",
+      "source": "walmart",
+      "orderId": "2000146-87408280"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "paper plates",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "paper bowls",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "fairlife 2% milk",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "Diet Coke (24-pack, 12 fl oz cans)",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "blueberries",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "blackberries",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "Ibuprofin",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "psyllium fiber",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "Shamrock Rockin' Protein Max — Vanilla",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "Shamrock Rockin' Protein Max — Strawberry",
+      "source": "walmart"
+    },
+    {
+      "date": "2026-06-05",
+      "name": "Shamrock Rockin' Protein Max — Chocolate",
+      "source": "walmart"
+    }
+  ]
+}

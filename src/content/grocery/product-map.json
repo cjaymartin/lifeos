@@ -1,0 +1,88 @@
+{
+  "fairlife 2% milk": {
+    "retailer": "walmart",
+    "productId": "43984343",
+    "product": "fairlife 2% Ultra-Filtered Milk, 52 fl oz",
+    "productUrl": "https://www.walmart.com/ip/43984343",
+    "pinned": true
+  },
+  "cream cheese": {
+    "retailer": "walmart",
+    "productId": "126245732",
+    "product": "Great Value Original Cream Cheese Spread, 16 oz Tub",
+    "productUrl": "https://www.walmart.com/ip/Great-Value-Original-Cream-Cheese-Spread-16-oz-Tub/126245732"
+  },
+  "paper plates": {
+    "retailer": "walmart",
+    "productId": "410940806",
+    "product": "Dixie Disposable Paper Plates, 8.5\", Multi-Color, 200 Count",
+    "productUrl": "https://www.walmart.com/ip/Dixie-Everyday-Disposable-Paper-Plates-8-5-Multi-Color-200-Count/410940806"
+  },
+  "paper bowls": {
+    "retailer": "walmart",
+    "productId": "137750406",
+    "product": "Great Value Everyday Disposable Paper Bowls, 20 oz, 50 Count",
+    "productUrl": "https://www.walmart.com/ip/Great-Value-Everyday-Disposable-Paper-Bowls-20-oz-50-Count/137750406"
+  },
+  "diet coke": {
+    "retailer": "walmart",
+    "productId": "20850597",
+    "product": "Diet Coke Diet Cola Soda Pop, 12 fl oz Cans, 24 Pack",
+    "productUrl": "https://www.walmart.com/ip/Diet-Coke-Diet-Cola-Soda-Pop-12-fl-oz-Cans-24-Pack/20850597",
+    "pinned": true
+  },
+  "diet coke (24-pack, 12 fl oz cans)": {
+    "retailer": "walmart",
+    "productId": "20850597",
+    "product": "Diet Coke Diet Cola Soda Pop, 12 fl oz Cans, 24 Pack",
+    "productUrl": "https://www.walmart.com/ip/20850597",
+    "pinned": true
+  },
+  "blueberries": {
+    "retailer": "walmart",
+    "productId": "161115457",
+    "productUrl": "https://www.walmart.com/ip/161115457",
+    "pinned": true
+  },
+  "blackberries": {
+    "retailer": "walmart",
+    "productId": "622057236",
+    "productUrl": "https://www.walmart.com/ip/622057236",
+    "pinned": true
+  },
+  "ibuprofin": {
+    "retailer": "walmart",
+    "productId": "39661525",
+    "product": "Equate Ibuprofen Pain Reliever and Fever Reducer Tablets, 200 mg, 500 Count",
+    "productUrl": "https://www.walmart.com/ip/39661525",
+    "pinned": true
+  },
+  "psyllium fiber": {
+    "retailer": "walmart",
+    "productId": "10423288",
+    "product": "Equate Daily Fiber Powder, Unflavored, 29 oz",
+    "productUrl": "https://www.walmart.com/ip/Equate-Daily-Fiber-Powder-29-oz/10423288",
+    "pinned": true
+  },
+  "shamrock rockin' protein max — strawberry": {
+    "retailer": "walmart",
+    "productId": "8242361492",
+    "product": "Shamrock Farms Rockin' Protein Max Strawberry, 19.7 fl oz",
+    "productUrl": "https://www.walmart.com/ip/Shamrock-Farms-Rockin-Protein-Max-Strawberry-19-7-FL-OZ/8242361492",
+    "pinned": true
+  },
+  "shamrock rockin' protein max — chocolate": {
+    "retailer": "walmart",
+    "productId": "999938672",
+    "product": "Shamrock Farms Rockin' Protein Max Chocolate, 19.7 fl oz",
+    "productUrl": "https://www.walmart.com/ip/Shamrock-Farms-Rockin-Protein-Max-Chocolate-19-7-FL-OZ/999938672",
+    "pinned": true
+  },
+  "shamrock rockin' protein max — vanilla": {
+    "retailer": "walmart",
+    "productId": "15401474380",
+    "product": "Shamrock Farms Rockin' Protein Max Vanilla, 19.7 fl oz",
+    "productUrl": "https://www.walmart.com/ip/Shamrock-Rockin-Protein-Max-Vanilla-19-7-FL-OZ/15401474380",
+    "pinned": true
+  }
+}

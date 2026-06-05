@@ -5,11 +5,26 @@ services:
     container_name: lifeos
     restart: unless-stopped
     env_file: .env
+    # Run as cjay (uid 1000) so headless claude can refresh + persist OAuth
+    # tokens in ~/.claude (an 8h-stale token broke the Refresh buttons when
+    # the mount was :ro), and so content writes aren't root-owned on the host.
+    user: "1000:1000"
+    environment:
+      HOME: /home/node
     volumes:
+      # Whole repo, read-only — nodemon inside the container watches it and
+      # rebuilds/restarts on structural changes (no image rebuilds needed).
+      # ro keeps the in-container claude unable to touch code; writable paths
+      # are mounted individually below.
+      - .:/app:ro
       - ./src/content:/app/src/content
-      - ./.claude:/app/.claude:ro
+      - ./data:/app/data
+      # Build artifacts live in named volumes so the ro repo mount stays clean
+      - lifeos_node_modules:/app/node_modules
+      - lifeos_dist:/app/dist
+      - lifeos_astro:/app/.astro
       - /home/cjay/.nvm/versions/node/v25.7.0/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe:/usr/local/bin/claude:ro
-      - /home/cjay/.claude:/root/.claude:ro
+      - /home/cjay/.claude:/home/node/.claude
     expose:
       - "4321"
     networks:
@@ -24,3 +39,8 @@ services:
 networks:
   traefik_proxy:
     external: true
+
+volumes:
+  lifeos_node_modules:
+  lifeos_dist:
+  lifeos_astro:

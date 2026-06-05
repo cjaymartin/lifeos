@@ -1,0 +1,88 @@
+---
+name: build-carts
+description: Build ONE Walmart cart from the grocery list by reordering exact products from past Walmart orders (Gmail + product-map.json), web-matching only as a fallback. Amazon only for items Walmart doesn't carry. NEVER places an order.
+---
+
+# Build Carts
+
+Read the grocery list and build **one Walmart cart** of add-to-cart links the user can open and check out **themselves**. Reordering known products beats guessing new ones.
+
+## ABSOLUTE RULE — never purchase
+
+You build links only. **Never** place, submit, or check out an order; never log in to a retailer; never enter payment, address, or account details; never open a checkout flow. If a page asks for login or payment, stop and move on. The user reviews the cart and checks out manually.
+
+## Step 1 — Read state
+
+- `src/content/grocery/grocery.json` — work only with items where `"checked": false`. If none, write carts.json with an empty carts array and stop.
+- `src/content/grocery/cart-request.json` (may not exist) — when present, `{ "itemIds": [...] }` is your work list: build ONLY for those item ids (intersected with the unchecked items). When absent, build for all unchecked items. The server resolves items with product-map entries instantly before spawning you, so your work list is normally just the unknown items.
+- `src/content/grocery/carts.json` (may not exist) — the CURRENT cart state. You MERGE into it, never replace it wholesale (Step 3).
+- Skip any item whose existing cart line is already fully added (`addedQty >= qty`) — it's in the user's real retailer cart; re-matching it would cause double-adds.
+- `src/content/grocery/product-map.json` (may not exist) — the product memory: `{ "<normalized item name>": { "retailer", "productId", "product", "productUrl", "pinned"? } }`. Entries with `"pinned": true` were chosen by the user.
+- `src/content/grocery/staples.json` — staple names help disambiguate.
+
+## Step 2 — Match each item, in strict priority order
+
+**The user wants reorders of the exact products they already buy — a fresh web guess is the last resort.**
+
+**`buyFrom` override:** an item with `"buyFrom": "amazon"` (or `"walmart"`) must be matched at that retailer ONLY — an amazon-buyFrom item goes straight to the Amazon cart (skip the Walmart steps for it), and a walmart-buyFrom item never falls back to Amazon (unmatched instead).
+
+1. **product-map.json hit** → reuse it directly with **ZERO lookups** — no Gmail, no web search, no fetch, no "confirming" or cross-checking of any kind. Copy the entry into the cart and move on; this should take seconds. `source: "reorder"`, confidence `high`. `pinned: true` entries are the user's explicit choice — use them verbatim even if you'd pick differently; if the entry lacks a `product` title, display the list item's name instead (do NOT look the title up). A pinned `amazon` entry goes in the Amazon cart — that's the user's call, not a fallback violation.
+2. **Past Walmart order emails** → search Gmail, e.g. `from:walmart.com <item keywords>` (also try `from:walmart.com subject:(thanks OR changes OR order) <keyword>`). Order/substitution emails contain exact product titles and often `walmart.com/ip/...` links — extract the title and item id of the product the user actually bought. `source: "reorder"`, confidence `high`. Example: "fairlife 2% milk" → find the exact Fairlife 52 fl oz product from a past order, not a lookalike.
+3. **Web search Walmart** (only if 1 and 2 miss) → try `WebFetch` of the direct search page `https://www.walmart.com/search?q=<url-encoded item>` first (optionally `&sort=best_seller`); fall back to `WebSearch` for `site:walmart.com/ip <item name>`. Extract the item id from `walmart.com/ip/<slug>/<itemId>`. `source: "new"`.
+   - **Same-container rule:** when parsing a search/results page, pair each product title with the link in the *same result block* — never a title from one result with a URL from another, and skip anything marked "Sponsored". Mismatched pairs are how wrong products end up in carts.
+   - **Picking among candidates:** prefer ordinary, household-normal sizes. When ratings are within ~0.5★ of each other, prefer the higher review count (4.0★ × 10,000 beats 5.0★ × 100). Prefer items sold/fulfilled by Walmart over third-party marketplace sellers (marketplace listings often carry inflated prices and flaky stock).
+4. **Amazon fallback** (only if the item genuinely can't be found at Walmart at all) → search `site:amazon.com <item>`, extract the ASIN from `/dp/<ASIN>`. Same same-container and review-count rules. These go in a separate minimal Amazon cart.
+5. Still nothing plausible → `unmatched` on the Walmart cart. Never force a bad match.
+
+**Verify on the product page (every `source: "new"` match):** `WebFetch` the actual `walmart.com/ip/<id>` (or `amazon.com/dp/<ASIN>`) page and confirm three things — the title matches what you searched for, a current price is shown, and it isn't out of stock / unavailable. Search-result snippets routinely show the wrong price or a different variant (promotions, sellers, pack sizes), and a redirect or title mismatch means the id is wrong — discard and try the next candidate. Only verified matches get confidence `high`; if the page is bot-gated and won't load, keep the match but cap confidence at `medium`. Reorders (priority 1–2) skip verification — the user already bought them.
+
+Budget your time: ~5-minute headless window. Gmail lookups are cheap — do them for every item; deep web verification only for the few `new` matches.
+
+## Step 3 — Write carts.json (MERGE, don't replace)
+
+Start from the existing carts.json and **carry over every line whose `itemId` is not in this run's work list** — those are server-resolved (instant) lines and lines already added to the real cart; dropping them breaks the UI's "in cart" tracking. Keep their `addedQty` exactly as-is. Then add/update lines for the items you matched, and rebuild each cart's `cartUrl` from all of its lines.
+
+**One Walmart cart.** An `amazon` cart ONLY if step 4 produced fallback items — never duplicate a Walmart-matched item into Amazon.
+
+Cart links:
+- Walmart: `https://affil.walmart.com/cart/addToCart?items=<id1>,<id2>_<qty>,...`
+- Amazon (fallback cart only): `https://www.amazon.com/gp/aws/cart/add.html?ASIN.1=<asin>&Quantity.1=1...`
+
+```json
+{
+  "builtAt": "<current ISO timestamp>",
+  "carts": [
+    {
+      "retailer": "walmart",
+      "label": "Walmart",
+      "cartUrl": "https://affil.walmart.com/cart/addToCart?items=123456789,987654321_2",
+      "items": [
+        {
+          "itemId": "<id from grocery.json>",
+          "name": "<item name from the list>",
+          "product": "Fairlife 2% Ultra-Filtered Milk, 52 fl oz",
+          "price": "$4.12",
+          "productUrl": "https://www.walmart.com/ip/.../123456789",
+          "productId": "123456789",
+          "qty": 1,
+          "confidence": "high",
+          "source": "reorder"
+        }
+      ],
+      "unmatched": ["dragon fruit"],
+      "notes": "<optional caveats>"
+    }
+  ]
+}
+```
+
+- `itemId` must be the exact `id` from grocery.json — the checkout flow uses it.
+- `productId` is required on every match (Walmart item id / Amazon ASIN) — the UI rebuilds `cartUrl` from these when the user removes items.
+- `addedQty` is UI-managed (tracks what the user already pushed to the real retailer cart). Never invent it — but if the **previous** carts.json has a line with the same `productId` carrying `addedQty`, copy it over so a rebuild doesn't cause double-adds.
+- Always write the file, even on a poor run — the UI uses its mtime to detect completion.
+
+## Step 4 — Update the product memory
+
+Write `src/content/grocery/product-map.json`: merge every confirmed match into the existing map keyed by lowercase item name (`{ "fairlife 2% milk": { "retailer": "walmart", "productId": "123456789", "product": "...", "productUrl": "..." } }`). Preserve entries for items not on this run's list. Don't store `low`-confidence guesses. **Never overwrite or remove an entry with `"pinned": true`** — those belong to the user (filling in a missing `product` title on a pinned entry is the only allowed edit).
+
+Do **not** modify grocery.json or any other file.

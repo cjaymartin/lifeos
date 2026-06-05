@@ -24,6 +24,7 @@ const SUGGESTIONS: Record<string, string[]> = {
   recipes: ['What recipes do I have?', 'Add a new recipe', 'Suggest a substitution'],
   budget: ['What did I spend this month?', 'Show my top categories', 'How am I tracking vs budget?'],
   journal: ['What did I write about recently?', 'Summarize this week', 'Find entries about a topic'],
+  grocery: ['Add ingredients for tacos', 'What am I low on?', 'Plan a dinner from my recipes'],
 };
 
 function getSuggestions(stackId: string): string[] {

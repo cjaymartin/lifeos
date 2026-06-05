@@ -1,0 +1,151 @@
+{
+  "staples": [
+    {
+      "id": "cream-cheese-wm2",
+      "name": "cream cheese",
+      "category": "Dairy & Eggs",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "dog-food-treats-wm3",
+      "name": "dog food/treats",
+      "category": "Household",
+      "status": "stocked",
+      "lastPurchased": "2026-06-02"
+    },
+    {
+      "id": "granola-bars-wm4",
+      "name": "granola bars",
+      "category": "Snacks",
+      "status": "stocked",
+      "lastPurchased": "2026-06-02"
+    },
+    {
+      "id": "sliced-ham-wm7",
+      "name": "sliced ham",
+      "category": "Meat & Seafood",
+      "status": "stocked",
+      "lastPurchased": "2026-03-18"
+    },
+    {
+      "id": "apples-wm9",
+      "name": "apples",
+      "category": "Produce",
+      "status": "stocked",
+      "lastPurchased": "2026-05-16"
+    },
+    {
+      "id": "blackberries-wm10",
+      "name": "blackberries",
+      "category": "Produce",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "blueberries-wm11",
+      "name": "blueberries",
+      "category": "Produce",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "chicken-sausage-patties-wm13",
+      "name": "chicken sausage patties",
+      "category": "Meat & Seafood",
+      "status": "stocked",
+      "lastPurchased": "2026-05-14"
+    },
+    {
+      "id": "grapes-wm14",
+      "name": "grapes",
+      "category": "Produce",
+      "status": "stocked",
+      "lastPurchased": "2026-05-06"
+    },
+    {
+      "id": "plastic-spoons-wm15",
+      "name": "plastic spoons",
+      "category": "Household",
+      "status": "stocked",
+      "lastPurchased": "2026-03-18"
+    },
+    {
+      "id": "sliced-turkey-wm17",
+      "name": "sliced turkey",
+      "category": "Meat & Seafood",
+      "status": "stocked",
+      "lastPurchased": "2026-04-20"
+    },
+    {
+      "id": "strawberries-wm18",
+      "name": "strawberries",
+      "category": "Produce",
+      "status": "stocked",
+      "lastPurchased": "2026-05-14"
+    },
+    {
+      "id": "fairlife-2-milk-mf7a5",
+      "name": "fairlife 2% milk",
+      "category": "Other",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "paper-plates-sts8r",
+      "name": "paper plates",
+      "category": "Other",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "paper-bowls-tzjwx",
+      "name": "paper bowls",
+      "category": "Other",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "diet-coke-24pk-dk9q3",
+      "name": "Diet Coke (24-pack, 12 fl oz cans)",
+      "category": "Beverages",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "ibuprofin-8jq5x",
+      "name": "Ibuprofin",
+      "category": "Other",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "psyllium-fiber-pf4n2",
+      "name": "psyllium fiber",
+      "category": "Other",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "shamrock-shake-strawberry-sk7r2",
+      "name": "Shamrock Rockin' Protein Max — Strawberry",
+      "category": "Beverages",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "shamrock-shake-chocolate-sk3m9",
+      "name": "Shamrock Rockin' Protein Max — Chocolate",
+      "category": "Beverages",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    },
+    {
+      "id": "shamrock-shake-vanilla-sk5v8",
+      "name": "Shamrock Rockin' Protein Max — Vanilla",
+      "category": "Beverages",
+      "status": "stocked",
+      "lastPurchased": "2026-06-05"
+    }
+  ]
+}

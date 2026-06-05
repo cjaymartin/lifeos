@@ -1,15 +1,15 @@
 {
-  "date": "2026-06-04",
+  "date": "2026-06-05",
   "greeting": "Good morning, C.Jay.",
-  "briefing": "It's a stunning sunny Thursday in Mattapoisett — currently 67° and heading for a high of 80°F. Southwest winds at 7–16 mph with gusts up to 26 mph this afternoon, but no rain in sight. Your calendar is clear, so the day is yours. Just 3 daily habits on the task list — a good day to get outside.",
+  "briefing": "Good morning! It's a mild 69° in Mattapoisett right now under clear skies, warming to a summery high of 82° with no rain in sight — a great day to be outside. You've got 3 small tasks due today and nothing overdue, so it's a light list. Your calendar is clear of meetings. Keep an eye out for your Amazon Pharmacy Bupropion refill, which should land today.",
   "weather": {
     "code": 0,
-    "current": 67,
-    "feelsLike": 67,
-    "condition": "Sunny",
-    "high": 80,
-    "low": 53,
-    "wind": 16,
+    "current": 69,
+    "feelsLike": 70,
+    "condition": "Clear",
+    "high": 82,
+    "low": 51,
+    "wind": 2,
     "precipitation": "None expected"
   },
   "tasks": {
@@ -18,7 +18,7 @@
     "items": [
       "Take Fiber",
       "Brush Teeth Morning",
-      "Brush Teeth Evening"
+      "Do Something (toward improving house/life)"
     ]
   },
   "calendar": [],
@@ -29,8 +29,8 @@
   },
   "items": [
     "Take Fiber (p1)",
-    "Brush Teeth — morning",
-    "Brush Teeth — evening at 7 PM",
-    "No meetings — open day, consider getting outside"
+    "Brush teeth — morning",
+    "Do Something toward improving house/life",
+    "Amazon Pharmacy Bupropion refill arrives today"
   ]
 }

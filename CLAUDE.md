@@ -36,10 +36,16 @@ LifeOS runs as a Portainer-managed stack on `lifeos.wolfdivided` and `lifeos.loc
 
 ### Updating after code changes
 
+**Nothing to do.** The container bind-mounts the repo read-only and runs `nodemon` (see `nodemon.json` + `scripts/build-and-serve.sh`): saving structural code on the host triggers an in-container `astro build` + server restart automatically (~10–30s). Data writes under `src/content/` are ignored by the watcher. A failed build doesn't kill the container — nodemon waits for the next file change and retries (check `docker logs lifeos`).
+
+Dependency changes are also automatic: `npm install <pkg>` on the host updates `package-lock.json`, which the watcher detects and re-runs `npm ci` inside the container.
+
+Rebuild the image only if the `Dockerfile` itself or the Node major version changes:
+
 ```bash
 cd /home/cjay/WebstormProjects/lifeos
 docker build -t lifeos:latest .
 docker compose -p lifeos up -d
 ```
 
-Or after rebuilding, go to Portainer → Stacks → lifeos → Recreate.
+Or after rebuilding, go to Portainer → Stacks → lifeos → Recreate. (A pinned, non-watching production image is still available via `docker build --target runtime`.)
