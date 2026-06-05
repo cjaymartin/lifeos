@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Package } from 'lucide-react';
+import { RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Package, Undo2, ChevronRight } from 'lucide-react';
 import type { Delivery, DeliveriesData, DeliveryStatus } from '@/lib/deliveries-types';
 import { STATUS_ORDER, STATUS_LABELS } from '@/lib/deliveries-types';
 
@@ -50,10 +50,14 @@ function lastSyncedLabel(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function DeliveryRow({ d, onDismiss }: { d: Delivery; onDismiss: (id: string) => void }) {
+function DeliveryRow({ d, onDismiss, onRestore }: {
+  d: Delivery;
+  onDismiss?: (id: string) => void;
+  onRestore?: (id: string) => void;
+}) {
   const eta = etaLabel(d.eta);
   return (
-    <li className="group flex items-start gap-3 rounded-lg border border-border bg-card p-4">
+    <li className={`group flex items-start gap-3 rounded-lg border border-border bg-card p-4 ${onRestore ? 'opacity-60 hover:opacity-100 transition-opacity' : ''}`}>
       <div className="mt-0.5 shrink-0 text-muted-foreground">
         <Package className="w-4 h-4" />
       </div>
@@ -92,13 +96,24 @@ function DeliveryRow({ d, onDismiss }: { d: Delivery; onDismiss: (id: string) =>
           )}
         </div>
       </div>
-      <button
-        onClick={() => onDismiss(d.id)}
-        title="Dismiss this delivery"
-        className="p-1 rounded text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 transition-colors"
-        aria-label={`Dismiss ${d.vendor} delivery`}>
-        <X className="w-4 h-4" />
-      </button>
+      {onDismiss && (
+        <button
+          onClick={() => onDismiss(d.id)}
+          title="Dismiss this delivery"
+          className="p-1 rounded text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 transition-colors"
+          aria-label={`Dismiss ${d.vendor} delivery`}>
+          <X className="w-4 h-4" />
+        </button>
+      )}
+      {onRestore && (
+        <button
+          onClick={() => onRestore(d.id)}
+          title="Restore this delivery"
+          className="p-1 rounded text-muted-foreground/30 hover:text-primary hover:bg-primary/10 transition-colors"
+          aria-label={`Restore ${d.vendor} delivery`}>
+          <Undo2 className="w-4 h-4" />
+        </button>
+      )}
     </li>
   );
 }
@@ -106,12 +121,41 @@ function DeliveryRow({ d, onDismiss }: { d: Delivery; onDismiss: (id: string) =>
 export default function DeliveriesApp({ initial }: { initial: DeliveriesData | null }) {
   const [data, setData] = useState<DeliveriesData | null>(initial);
   const [state, setState] = useState<RefreshState>('idle');
+  const [showDismissed, setShowDismissed] = useState(false);
 
   const handleDismiss = useCallback(async (id: string) => {
-    // Optimistic remove; the sync skill also honours dismissed.json
-    setData(d => d ? { ...d, deliveries: d.deliveries.filter(x => x.id !== id) } : d);
+    // Optimistic move to dismissed; the sync skill also honours dismissed.json
+    setData(d => {
+      if (!d) return d;
+      const item = d.deliveries.find(x => x.id === id);
+      return {
+        ...d,
+        deliveries: d.deliveries.filter(x => x.id !== id),
+        dismissed: item ? [...(d.dismissed ?? []), item] : d.dismissed,
+      };
+    });
     try {
       await fetch('/api/deliveries/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+    } catch {}
+  }, []);
+
+  const handleRestore = useCallback(async (id: string) => {
+    // Optimistic move back to active
+    setData(d => {
+      if (!d) return d;
+      const item = (d.dismissed ?? []).find(x => x.id === id);
+      return {
+        ...d,
+        deliveries: item ? [...d.deliveries, item] : d.deliveries,
+        dismissed: (d.dismissed ?? []).filter(x => x.id !== id),
+      };
+    });
+    try {
+      await fetch('/api/deliveries/restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -168,6 +212,7 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
   }[state];
 
   const deliveries = data?.deliveries ?? [];
+  const dismissed = data?.dismissed ?? [];
   const groups = STATUS_ORDER
     .map(status => ({ status, items: deliveries.filter(d => d.status === status) }))
     .filter(g => g.items.length > 0);
@@ -217,6 +262,22 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
           </ul>
         </section>
       ))}
+
+      {dismissed.length > 0 && (
+        <section className="space-y-2 pt-2">
+          <button
+            onClick={() => setShowDismissed(s => !s)}
+            className="flex items-center gap-1 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showDismissed ? 'rotate-90' : ''}`} />
+            Dismissed ({dismissed.length})
+          </button>
+          {showDismissed && (
+            <ul className="space-y-2">
+              {dismissed.map(d => <DeliveryRow key={d.id} d={d} onRestore={handleRestore} />)}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   );
 }

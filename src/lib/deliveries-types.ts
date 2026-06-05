@@ -28,6 +28,8 @@ export interface DeliveriesData {
   /** ISO timestamp of the last successful Gmail sync */
   lastSynced: string;
   deliveries: Delivery[];
+  /** Dismissed deliveries still present in deliveries.json — restorable from the UI */
+  dismissed?: Delivery[];
 }
 
 export const STATUS_ORDER: DeliveryStatus[] = ['out-for-delivery', 'shipped', 'ordered', 'delivered'];

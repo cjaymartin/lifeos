@@ -28,25 +28,30 @@ function runClaude(prompt: string): Promise<string> {
       'claude',
       [
         '-p', prompt,
-        '--allowedTools', 'Write',
+        // Edit included — models reach for Edit on existing files, and a
+        // denied edit headless leads to falsely-claimed success
+        '--allowedTools', 'Write Edit Read',
         '--output-format', 'text',
       ],
       {
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
+        // detached → own process group: claude's exit-time cleanup signals
+        // can never reach the server
+        detached: true,
       }
     );
 
     proc.stdout.on('data', (d: Buffer) => chunks.push(d.toString()));
+    // 60-second timeout
+    const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 60_000);
     proc.on('close', code => {
+      clearTimeout(timer);
       if (code === 0 || chunks.length > 0) resolve(chunks.join('').trim());
       else reject(new Error(`claude exited with code ${code}`));
     });
-    proc.on('error', reject);
-
-    // 60-second timeout
-    setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 60_000);
+    proc.on('error', err => { clearTimeout(timer); reject(err); });
   });
 }
 

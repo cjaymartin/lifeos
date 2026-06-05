@@ -1,20 +1,20 @@
 {
-  "lastSynced": "2026-06-04T15:30:00-04:00",
+  "lastSynced": "2026-06-05T08:25:10-04:00",
   "deliveries": [
     {
-      "id": "114-1679833-9049007",
-      "vendor": "Amazon",
-      "item": "Bedlifes Deep Pocket Sheets (King) + SONORO KATE Egyptian sheets — 3 items, 2 orders, 1 box",
-      "category": "package",
-      "carrier": "Amazon",
+      "id": "amazon-pharmacy-bupropion-20260604",
+      "vendor": "Amazon Pharmacy",
+      "item": "Bupropion (24HR) 150 MG — 30-day supply",
+      "category": "pharmacy",
+      "carrier": null,
       "trackingNumber": null,
-      "trackingUrl": null,
+      "trackingUrl": "https://pharmacy.amazon.com/dashboard/orders",
       "status": "shipped",
-      "eta": "2026-05-29",
+      "eta": "2026-06-05",
       "etaWindow": null,
       "deliveredAt": null,
-      "emailThreadId": "19e6f8920cc8abaf",
-      "emailUrl": "https://mail.google.com/mail/u/0/#all/19e6f8920cc8abaf"
+      "emailThreadId": "19e94b92cb32e9d7",
+      "emailUrl": "https://mail.google.com/mail/u/0/#all/19e94b92cb32e9d7"
     },
     {
       "id": "113-3400877-0153026",
@@ -32,19 +32,19 @@
       "emailUrl": "https://mail.google.com/mail/u/0/#all/19e93f1604167326"
     },
     {
-      "id": "114-2830319-9536232",
+      "id": "amazon-owen-mumford-ownaj1300-20260605",
       "vendor": "Amazon",
-      "item": "Neutrogena Oil-Free Acne Face Wash",
-      "category": "package",
+      "item": "Owen Mumford OWNAJ1300 injection aid (Order #113-6941914-2637018)",
+      "category": "pharmacy",
       "carrier": "Amazon",
       "trackingNumber": null,
       "trackingUrl": null,
       "status": "ordered",
-      "eta": null,
+      "eta": "2026-06-07",
       "etaWindow": null,
       "deliveredAt": null,
-      "emailThreadId": "19e6ae563b06047b",
-      "emailUrl": "https://mail.google.com/mail/u/0/#all/19e6ae563b06047b"
+      "emailThreadId": "19e978b13923e80d",
+      "emailUrl": "https://mail.google.com/mail/u/0/#all/19e978b13923e80d"
     },
     {
       "id": "300981",

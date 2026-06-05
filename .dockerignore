@@ -1,0 +1,10 @@
+# keep the build context lean — and keep secrets/instance data out of the image
+node_modules
+dist
+.astro
+.git
+data
+.env
+.env.*
+src/content/**/.refresh-lock
+src/content/**/.refresh-log

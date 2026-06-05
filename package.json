@@ -29,6 +29,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",
+    "nodemon": "^3.1.14",
     "otplib": "^13.4.1",
     "playwright": "^1.60.0",
     "react": "^19.2.7",

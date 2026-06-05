@@ -31,9 +31,11 @@ export async function loadDeliveries(): Promise<DeliveriesData | null> {
     lastSynced = (await stat(DELIVERIES_FILE)).mtime.toISOString();
   } catch {}
 
+  const all = data.deliveries ?? [];
   return {
     ...data,
     lastSynced,
-    deliveries: (data.deliveries ?? []).filter(d => !dismissed.includes(d.id)),
+    deliveries: all.filter(d => !dismissed.includes(d.id)),
+    dismissed: all.filter(d => dismissed.includes(d.id)),
   };
 }

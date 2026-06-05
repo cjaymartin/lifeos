@@ -12,6 +12,17 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# headless claude refresh runs (lock + captured output)
+src/content/**/.refresh-lock
+src/content/**/.refresh-log
+
+# grocery micro-agent runs (locks, logs, transient agent output)
+src/content/grocery/.*-lock
+src/content/grocery/.*-log
+src/content/grocery/.categorized.json
+src/content/grocery/.scan-results.json
+src/content/grocery/cart-request.json
+
 
 # environment variables
 .env
@@ -31,3 +42,6 @@ src/content/settings/secrets.json.enc
 src/content/settings/.profiles/
 src/content/settings/.job-*
 src/content/settings/.probe-*
+
+# claude code session worktrees
+.claude/worktrees/
