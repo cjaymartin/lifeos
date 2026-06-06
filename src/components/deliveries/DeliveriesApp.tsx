@@ -1,8 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Package, Undo2, ChevronRight } from 'lucide-react';
 import type { Delivery, DeliveriesData, DeliveryStatus } from '@/lib/deliveries-types';
 import { STATUS_ORDER, STATUS_LABELS } from '@/lib/deliveries-types';
 import { watchRefreshJob, JOB_STATE_COLORS, type JobState } from '@/lib/client/job-watch';
+import { makeOptimistic } from '@/lib/client/stack-client';
+import { deliveriesClient } from '@/features/deliveries/client';
 
 const STATUS_BADGE: Record<DeliveryStatus, string> = {
   'out-for-delivery': 'bg-warning-subtle text-warning',
@@ -122,9 +124,21 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
   const [state, setState] = useState<JobState>('idle');
   const [showDismissed, setShowDismissed] = useState(false);
 
-  const handleDismiss = useCallback(async (id: string) => {
+  const mutate = useMemo(
+    () =>
+      makeOptimistic<DeliveriesData | null>({
+        apply: (updater) => setData(updater),
+        // No GET endpoint for deliveries (the page SSRs its data) — server
+        // truth is a reload. Rollback: a failed dismiss/restore no longer
+        // leaves the UI lying.
+        refetch: async () => window.location.reload(),
+      }),
+    [],
+  );
+
+  const handleDismiss = useCallback((id: string) =>
     // Optimistic move to dismissed; the sync skill also honours dismissed.json
-    setData(d => {
+    mutate(d => {
       if (!d) return d;
       const item = d.deliveries.find(x => x.id === id);
       return {
@@ -132,19 +146,11 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
         deliveries: d.deliveries.filter(x => x.id !== id),
         dismissed: item ? [...(d.dismissed ?? []), item] : d.dismissed,
       };
-    });
-    try {
-      await fetch('/api/deliveries/dismiss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-    } catch {}
-  }, []);
+    }, () => deliveriesClient.dismiss(id)), [mutate]);
 
-  const handleRestore = useCallback(async (id: string) => {
+  const handleRestore = useCallback((id: string) =>
     // Optimistic move back to active
-    setData(d => {
+    mutate(d => {
       if (!d) return d;
       const item = (d.dismissed ?? []).find(x => x.id === id);
       return {
@@ -152,15 +158,7 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
         deliveries: item ? [...d.deliveries, item] : d.deliveries,
         dismissed: (d.dismissed ?? []).filter(x => x.id !== id),
       };
-    });
-    try {
-      await fetch('/api/deliveries/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-    } catch {}
-  }, []);
+    }, () => deliveriesClient.restore(id)), [mutate]);
 
   const handleRefresh = useCallback(async () => {
     if (state === 'loading') return;

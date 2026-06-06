@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ShoppingCart, RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Star,
   ChevronRight, Plus, Loader2, Trash2, ListChecks, Search, Settings,
@@ -11,6 +11,8 @@ import {
   normalizeName, buildAddToCartUrl,
 } from '@/lib/grocery-types';
 import { pollJob, watchFlagJob, type JobState, type JobHandle } from '@/lib/client/job-watch';
+import { makeOptimistic } from '@/lib/client/stack-client';
+import { groceryClient } from '@/features/grocery/client';
 
 interface ProgressEvent { t: 'tool' | 'note' | 'result'; label: string }
 interface BuildProgress { running: boolean; events: ProgressEvent[]; done: boolean; ok: boolean | null }
@@ -327,10 +329,17 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
 
   const refetch = useCallback(async () => {
     try {
-      const res = await fetch('/api/grocery');
-      if (res.ok) setState(await res.json());
+      setState(await groceryClient.state());
     } catch {}
   }, []);
+
+  // Optimistic cycle: apply locally, call the typed client, refetch on
+  // failure (rollback) — and on success too where server-side ripple effects
+  // need picking up (sync: 'always').
+  const mutate = useMemo(
+    () => makeOptimistic<GroceryState>({ apply: (u) => setState(u), refetch }),
+    [refetch],
+  );
 
   const toggleCollapsed = (cat: string) => {
     setCollapsed(c => {
@@ -368,12 +377,7 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
       }],
     }));
     try {
-      const res = await fetch('/api/grocery', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const { added, categorizing } = await res.json() as { added: GroceryItem[]; categorizing: boolean };
+      const { added, categorizing } = await groceryClient.addItem(name);
       setState(s => ({
         ...s,
         items: [...s.items.filter(i => i.id !== tempId), ...added],
@@ -384,102 +388,69 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
     }
   }, [input, pollCategorize]);
 
-  const patchItem = useCallback(async (id: string, patch: Partial<GroceryItem>) => {
-    try {
-      await fetch(`/api/grocery/items/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
-    } catch {}
-  }, []);
-
-  const handleToggle = useCallback((item: GroceryItem) => {
-    setState(s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, checked: !i.checked } : i) }));
-    patchItem(item.id, { checked: !item.checked });
-  }, [patchItem]);
+  const handleToggle = useCallback((item: GroceryItem) =>
+    mutate(
+      s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, checked: !i.checked } : i) }),
+      () => groceryClient.patchItem(item.id, { checked: !item.checked }),
+    ), [mutate]);
 
   const handleStar = useCallback((item: GroceryItem) => {
     const staple = !item.staple;
-    setState(s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, staple } : i) }));
-    patchItem(item.id, { staple }).then(refetch); // refetch to pick up staples.json change
-  }, [patchItem, refetch]);
+    return mutate(
+      s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, staple } : i) }),
+      () => groceryClient.patchItem(item.id, { staple }),
+      { sync: 'always' }, // pick up the staples.json change
+    );
+  }, [mutate]);
 
-  const renameItem = useCallback(async (item: GroceryItem, name: string) => {
-    setState(s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, name } : i) }));
-    await patchItem(item.id, { name });
-    await refetch(); // staple/pin renames ride along server-side
-  }, [patchItem, refetch]);
+  const renameItem = useCallback((item: GroceryItem, name: string) =>
+    mutate(
+      s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, name } : i) }),
+      () => groceryClient.patchItem(item.id, { name }),
+      { sync: 'always' }, // staple/pin renames ride along server-side
+    ), [mutate]);
 
-  const setItemBuyFrom = useCallback(async (item: GroceryItem, retailer: Retailer | null) => {
-    setState(s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, buyFrom: retailer ?? undefined } : i) }));
-    try {
-      await fetch(`/api/grocery/items/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ buyFrom: retailer }),
-      });
-      await refetch();
-    } catch {}
-  }, [refetch]);
+  const setItemBuyFrom = useCallback((item: GroceryItem, retailer: Retailer | null) =>
+    mutate(
+      s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, buyFrom: retailer ?? undefined } : i) }),
+      () => groceryClient.patchItem(item.id, { buyFrom: retailer }),
+      { sync: 'always' },
+    ), [mutate]);
 
   /** Generic staple PATCH + refetch (rename, buyFrom, restockAt). */
-  const patchStaple = useCallback(async (id: string, patch: Record<string, unknown>) => {
-    try {
-      await fetch('/api/grocery/staples', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, ...patch }),
-      });
-      await refetch();
-    } catch {}
-  }, [refetch]);
+  const patchStaple = useCallback((id: string, patch: Record<string, unknown>) =>
+    mutate(s => s, () => groceryClient.patchStaple(id, patch), { sync: 'always' }), [mutate]);
 
-  const handleDelete = useCallback(async (item: GroceryItem) => {
-    setState(s => ({ ...s, items: s.items.filter(i => i.id !== item.id) }));
-    try { await fetch(`/api/grocery/items/${item.id}`, { method: 'DELETE' }); } catch {}
-  }, []);
+  const handleDelete = useCallback((item: GroceryItem) =>
+    mutate(
+      s => ({ ...s, items: s.items.filter(i => i.id !== item.id) }),
+      () => groceryClient.deleteItem(item.id),
+    ), [mutate]);
 
   /* ── Staples ───────────────────────────────────────────────────────── */
 
-  const cycleStaple = useCallback(async (staple: Staple) => {
+  const cycleStaple = useCallback((staple: Staple) => {
     const status = NEXT_STATUS[staple.status];
-    setState(s => ({ ...s, staples: s.staples.map(x => x.id === staple.id ? { ...x, status } : x) }));
-    try {
-      await fetch('/api/grocery/staples', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: staple.id, status }),
-      });
-      await refetch(); // low/out may have auto-added a list item
-    } catch {}
-  }, [refetch]);
+    return mutate(
+      s => ({ ...s, staples: s.staples.map(x => x.id === staple.id ? { ...x, status } : x) }),
+      () => groceryClient.patchStaple(staple.id, { status }),
+      { sync: 'always' }, // low/out may have auto-added a list item
+    );
+  }, [mutate]);
 
   const addStaple = useCallback(async () => {
     const name = stapleInput.trim();
     if (!name) return;
     setStapleInput('');
-    try {
-      await fetch('/api/grocery/staples', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      await refetch();
-    } catch {}
-  }, [stapleInput, refetch]);
+    await mutate(s => s, () => groceryClient.addStaple(name), { sync: 'always' });
+  }, [stapleInput, mutate]);
 
-  const setStapleCategory = useCallback(async (staple: Staple, category: string) => {
-    setState(s => ({ ...s, staples: s.staples.map(x => x.id === staple.id ? { ...x, category } : x) }));
-    try {
-      await fetch('/api/grocery/staples', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: staple.id, category }),
-      });
-      await refetch(); // matching list items get re-filed too
-    } catch {}
-  }, [refetch]);
+  const setStapleCategory = useCallback((staple: Staple, category: string) =>
+    mutate(
+      s => ({ ...s, staples: s.staples.map(x => x.id === staple.id ? { ...x, category } : x) }),
+      () => groceryClient.patchStaple(staple.id, { category }),
+      { sync: 'always' }, // matching list items get re-filed too
+    ), [mutate]);
 
   const toggleStapleCollapsed = useCallback((cat: string) => {
     setStapleCollapsed(c => {
@@ -489,17 +460,11 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
     });
   }, []);
 
-  const deleteStaple = useCallback(async (staple: Staple) => {
-    setState(s => ({ ...s, staples: s.staples.filter(x => x.id !== staple.id) }));
-    try {
-      await fetch('/api/grocery/staples', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: staple.id }),
-      });
-      await refetch();
-    } catch {}
-  }, [refetch]);
+  const deleteStaple = useCallback((staple: Staple) =>
+    mutate(
+      s => ({ ...s, staples: s.staples.filter(x => x.id !== staple.id) }),
+      () => groceryClient.deleteStaple(staple.id),
+    ), [mutate]);
 
   /* ── Build carts (live-progress modal) ─────────────────────────────── */
 
@@ -509,14 +474,14 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
     setProgress(null);
     setInstantCount(0);
     try {
-      const res = await fetch('/api/grocery/build-carts', {
-        method: 'POST',
-        ...(itemIds?.length
-          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemIds }) }
-          : {}),
-      });
-      if (!res.ok) { setBuildState('error'); setBuildModal(true); return; }
-      const { instant = 0, queued = 0 } = await res.json() as { instant?: number; queued?: number };
+      let instant = 0, queued = 0;
+      try {
+        const r = await groceryClient.buildCarts(itemIds);
+        instant = r.instant ?? 0;
+        queued = r.queued ?? 0;
+      } catch {
+        setBuildState('error'); setBuildModal(true); return;
+      }
       setInstantCount(instant);
 
       if (queued === 0) {
@@ -561,11 +526,9 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
   ) => {
     setJobState('loading');
     try {
-      const res = await fetch(`/api/grocery/${kind}`, {
-        method: 'POST',
-        ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
-      });
-      if (!res.ok) { setJobState('error'); return; }
+      try {
+        await groceryClient.triggerJob(kind);
+      } catch { setJobState('error'); return; }
 
       const result = await watchFlagJob({
         statusUrl: '/api/grocery/status',
@@ -583,32 +546,18 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
 
   const pinSave = useCallback(async (name: string, url: string): Promise<string | null> => {
     try {
-      const res = await fetch('/api/grocery/product-map', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, url }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null) as { error?: string } | null;
-        return data?.error ?? 'Could not save that link.';
-      }
+      await groceryClient.pinProduct(name, url);
       await refetch();
       return null;
-    } catch {
-      return 'Could not reach the server.';
+    } catch (e) {
+      if (e instanceof TypeError) return 'Could not reach the server.';
+      const msg = e instanceof Error ? e.message : '';
+      return msg && !msg.startsWith('HTTP') ? msg : 'Could not save that link.';
     }
   }, [refetch]);
 
-  const pinClear = useCallback(async (name: string) => {
-    try {
-      await fetch('/api/grocery/product-map', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      await refetch();
-    } catch {}
-  }, [refetch]);
+  const pinClear = useCallback((name: string) =>
+    mutate(s => s, () => groceryClient.clearPin(name), { sync: 'always' }), [mutate]);
 
   /* ── Cart selection mode ───────────────────────────────────────────── */
 
@@ -628,44 +577,29 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
 
   const removeCartItem = useCallback(async (retailer: Retailer, itemId: string) => {
     // Optimistic: drop the match locally (cartUrl is rebuilt server-side)
-    setState(s => {
+    await mutate(s => {
       if (!s.carts) return s;
       const carts = s.carts.carts
         .map(c => c.retailer === retailer ? { ...c, items: c.items.filter(m => m.itemId !== itemId) } : c)
         .filter(c => c.items.length > 0 || c.unmatched.length > 0);
       return { ...s, carts: carts.length ? { ...s.carts, carts } : null };
-    });
-    try {
-      await fetch('/api/grocery/carts', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retailer, itemId }),
-      });
-      await refetch(); // pick up the rebuilt cartUrl
-    } catch {}
-  }, [refetch]);
+    }, () => groceryClient.removeCartItem(retailer, itemId),
+       { sync: 'always' }); // pick up the rebuilt cartUrl
+  }, [mutate]);
 
-  const dismissCart = useCallback(async (retailer: Retailer) => {
-    setState(s => {
+  const dismissCart = useCallback((retailer: Retailer) =>
+    mutate(s => {
       if (!s.carts) return s;
       const carts = s.carts.carts.filter(c => c.retailer !== retailer);
       return { ...s, carts: carts.length ? { ...s.carts, carts } : null };
-    });
-    try {
-      await fetch('/api/grocery/carts', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retailer }),
-      });
-    } catch {}
-  }, []);
+    }, () => groceryClient.dismissCart(retailer)), [mutate]);
 
   /** Record (or forget) that the pending lines were pushed to the retailer
    *  cart. NOTE: callers must NOT run this synchronously from the add-link's
    *  onClick — the state update replaces the <a> mid-click and some browsers
    *  cancel the navigation, so nothing gets added. Defer it instead. */
-  const setCartAdded = useCallback(async (retailer: Retailer, added: boolean) => {
-    setState(s => {
+  const setCartAdded = useCallback((retailer: Retailer, added: boolean) =>
+    mutate(s => {
       if (!s.carts) return s;
       return {
         ...s,
@@ -681,40 +615,20 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
             : c),
         },
       };
-    });
-    try {
-      await fetch('/api/grocery/carts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retailer, action: added ? 'mark-added' : 'reset-added' }),
-      });
-    } catch {}
-  }, []);
+    }, () => groceryClient.setCartAdded(retailer, added)), [mutate]);
 
-  const checkoutCart = useCallback(async (retailer: Retailer) => {
-    try {
-      await fetch('/api/grocery/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retailer }),
-      });
-      await refetch();
-    } catch {}
-  }, [refetch]);
+  const checkoutCart = useCallback((retailer: Retailer) =>
+    mutate(s => s, () => groceryClient.checkout({ retailer }), { sync: 'always' }), [mutate]);
 
   const clearChecked = useCallback(async () => {
     const ids = state.items.filter(i => i.checked).map(i => i.id);
     if (ids.length === 0) return;
-    setState(s => ({ ...s, items: s.items.filter(i => !i.checked) }));
-    try {
-      await fetch('/api/grocery/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds: ids }),
-      });
-      await refetch();
-    } catch {}
-  }, [state.items, refetch]);
+    await mutate(
+      s => ({ ...s, items: s.items.filter(i => !i.checked) }),
+      () => groceryClient.checkout({ itemIds: ids }),
+      { sync: 'always' },
+    );
+  }, [state.items, mutate]);
 
   /* ── Render ────────────────────────────────────────────────────────── */
 

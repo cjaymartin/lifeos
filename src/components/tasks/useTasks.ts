@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { apiCall, makeOptimistic } from '@/lib/client/stack-client';
 import type { CompletedTask, TasksSnapshot } from '@/lib/tasks/types';
 
 export interface SyncStatus {
@@ -51,98 +52,81 @@ export function useTasks(initial?: TasksData) {
 
   // ── Optimistic mutations ──
   // Apply locally first, hit the API, refetch on failure to resync truth.
+  // Transport (CSRF body rule, error extraction) lives in the stack client.
 
-  const mutate = useCallback(
-    (apply: (d: TasksData) => TasksData) => {
-      setData((d) => (d ? apply(d) : d));
-    },
-    [],
+  const mutate = useMemo(
+    () =>
+      makeOptimistic<TasksData>({
+        apply: (updater) => setData((d) => (d ? updater(d) : d)),
+        refetch,
+        onError: setError,
+      }),
+    [refetch],
   );
 
-  const call = useCallback(
-    async (input: string, init: RequestInit) => {
+  const completeTask = useCallback(
+    (id: string) =>
+      mutate(
+        (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }),
+        () => apiCall(`/api/tasks/${id}/complete`, { method: 'POST' }),
+      ),
+    [mutate],
+  );
+
+  const reopenTask = useCallback(
+    (id: string) => mutate((d) => d, () => apiCall(`/api/tasks/${id}/reopen`, { method: 'POST' })),
+    [mutate],
+  );
+
+  const deleteTask = useCallback(
+    (id: string) =>
+      mutate(
+        (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id && t.parentId !== id) }),
+        () => apiCall(`/api/tasks/${id}`, { method: 'DELETE' }),
+      ),
+    [mutate],
+  );
+
+  const updateTask = useCallback(
+    (id: string, body: Record<string, unknown>) =>
+      // Optimistically apply the simple fields we can mirror locally
+      mutate(
+        (d) => ({
+          ...d,
+          tasks: d.tasks.map((t) =>
+            t.id === id
+              ? {
+                  ...t,
+                  ...(typeof body.content === 'string' ? { content: body.content } : {}),
+                  ...(typeof body.description === 'string' ? { description: body.description } : {}),
+                  ...(typeof body.priority === 'number' ? { priority: body.priority as 1 | 2 | 3 | 4 } : {}),
+                  ...(body.clearDue ? { due: null } : {}),
+                }
+              : t,
+          ),
+        }),
+        () => apiCall(`/api/tasks/${id}`, { method: 'PATCH', body }),
+      ),
+    [mutate],
+  );
+
+  // Throws on failure — QuickAdd keeps the typed input when the add fails.
+  const addTask = useCallback(
+    async (body: Record<string, unknown>) => {
       try {
-        // Always send a JSON content-type (with a body to match): Astro's CSRF
-        // protection rejects bodyless/no-content-type mutations behind a
-        // TLS-terminating proxy, where the forwarded origin appears to mismatch.
-        const res = await fetch(input, {
-          ...init,
-          headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
-          body: init.body ?? '{}',
-        });
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          throw new Error(body?.error ?? `HTTP ${res.status}`);
-        }
+        await apiCall('/api/tasks', { method: 'POST', body });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'request failed');
-        void refetch(); // roll back optimistic state to server truth
+        void refetch();
         throw e;
       }
     },
     [refetch],
   );
 
-  const completeTask = useCallback(
-    (id: string) => {
-      mutate((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
-      return call(`/api/tasks/${id}/complete`, { method: 'POST' }).catch(() => {});
-    },
-    [mutate, call],
-  );
-
-  const reopenTask = useCallback(
-    (id: string) => call(`/api/tasks/${id}/reopen`, { method: 'POST' }).catch(() => {}),
-    [call],
-  );
-
-  const deleteTask = useCallback(
-    (id: string) => {
-      mutate((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id && t.parentId !== id) }));
-      return call(`/api/tasks/${id}`, { method: 'DELETE' }).catch(() => {});
-    },
-    [mutate, call],
-  );
-
-  const updateTask = useCallback(
-    (id: string, body: Record<string, unknown>) => {
-      // Optimistically apply the simple fields we can mirror locally
-      mutate((d) => ({
-        ...d,
-        tasks: d.tasks.map((t) =>
-          t.id === id
-            ? {
-                ...t,
-                ...(typeof body.content === 'string' ? { content: body.content } : {}),
-                ...(typeof body.description === 'string' ? { description: body.description } : {}),
-                ...(typeof body.priority === 'number' ? { priority: body.priority as 1 | 2 | 3 | 4 } : {}),
-                ...(body.clearDue ? { due: null } : {}),
-              }
-            : t,
-        ),
-      }));
-      return call(`/api/tasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).catch(() => {});
-    },
-    [mutate, call],
-  );
-
-  const addTask = useCallback(
-    (body: Record<string, unknown>) =>
-      call('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
-    [call],
-  );
-
   const forceSync = useCallback(
-    () => call('/api/tasks/sync', { method: 'POST' }).catch(() => {}),
-    [call],
+    () => mutate((d) => d, () => apiCall('/api/tasks/sync', { method: 'POST' })),
+    [mutate],
   );
 
   return {
