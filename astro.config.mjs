@@ -10,7 +10,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   output: 'server',
-  adapter: node({ mode: 'standalone' }),
+  // experimentalDisableStreaming: render each page fully before sending headers.
+  // With HTML streaming on, an island that throws during SSR aborts *after* a
+  // 200 + partial body are already on the wire — the Node adapter can only reset
+  // the socket (or, depending where the throw lands, hang until the browser
+  // times out), leaving no error page and nothing actionable (NIM-5). Buffering
+  // makes a render throw surface before headers go out, so Astro returns a real
+  // 500 error page instead. Pages here are small and data is local, so the lost
+  // streaming is imperceptible. Regression-tested by tests/qa case GROC-13.
+  adapter: node({ mode: 'standalone', experimentalDisableStreaming: true }),
   server: { host: '0.0.0.0', port: 4321 },
   security: {
     // Trust Traefik's X-Forwarded-Proto/Host for these hosts — without this the
