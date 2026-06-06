@@ -1,0 +1,29 @@
+---
+import WidgetCard from '@/components/widgets/WidgetCard.astro';
+import type { WidgetDef } from '@/lib/widgets';
+
+interface Props {
+  w: WidgetDef;
+}
+const { w } = Astro.props;
+
+const style =
+  w.config.style === 'warning' ? 'bg-warning-subtle border-warning-border' :
+  w.config.style === 'success' ? 'bg-emerald-500/10 border-emerald-500/40' :
+  'bg-card border-border';
+---
+
+{w.config.content && (
+  <WidgetCard
+    class={`space-y-1.5 ${style}`}
+    link={w.config.link ? String(w.config.link) : undefined}
+    linkLabel={`Open ${w.label}`}
+  >
+    {w.label && (
+      <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        {w.label}
+      </span>
+    )}
+    <p class="text-sm text-foreground">{String(w.config.content)}</p>
+  </WidgetCard>
+)}

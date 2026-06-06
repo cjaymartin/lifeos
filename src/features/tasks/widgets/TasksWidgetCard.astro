@@ -1,0 +1,13 @@
+---
+import TasksWidget from '@/components/tasks/TasksWidget';
+import type { WidgetDef } from '@/lib/widgets';
+
+interface Props {
+  w: WidgetDef;
+  /** Live tasks mirror snapshot + sync status (kept fresh via SSE client-side). */
+  tasksInitial: Record<string, unknown>;
+}
+const { w, tasksInitial } = Astro.props;
+---
+
+<TasksWidget client:load initial={tasksInitial} maxItems={Number(w.config.maxItems ?? 5)} />

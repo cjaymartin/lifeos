@@ -1,0 +1,30 @@
+---
+/**
+ * Shared dashboard-card chrome: rounded border, padding, and the optional
+ * corner link icon (previously copy-pasted into every widget branch).
+ */
+interface Props {
+  /** Extra wrapper classes — layout + color (base: relative rounded-xl border p-5). */
+  class?: string;
+  link?: string;
+  linkLabel?: string;
+  /** External links open a new tab; in-app links (e.g. /deliveries) don't. */
+  external?: boolean;
+}
+const { class: className = 'bg-card border-border', link, linkLabel, external = true } = Astro.props;
+---
+
+<div class={`relative rounded-xl border p-5 ${className}`}>
+  {link && (
+    <a href={link} {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
+       aria-label={linkLabel}>
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+        <polyline points="15 3 21 3 21 9"/>
+        <line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+    </a>
+  )}
+  <slot />
+</div>

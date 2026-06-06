@@ -1,0 +1,15 @@
+---
+import type { WidgetDef, DailyData } from '@/lib/widgets';
+
+interface Props {
+  w: WidgetDef;
+  daily: DailyData | null;
+}
+const { daily } = Astro.props;
+---
+
+{daily?.briefing && (
+  <p class="text-sm text-muted-foreground leading-relaxed border-l-2 border-border pl-4 italic">
+    {daily.briefing}
+  </p>
+)}
