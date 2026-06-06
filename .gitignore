@@ -51,3 +51,4 @@ src/content/settings/.probe-*
 test-results/
 playwright-report/
 tests/e2e/.auth/
+tests/qa/.artifacts/
