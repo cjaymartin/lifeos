@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { getSnapshot, taskEvents } from '@/lib/tasks/store';
-import { ensureSyncLoop } from '@/lib/tasks/sync-loop';
+import { getSnapshot, taskEvents } from '@/features/tasks/ops/store';
+import { ensureSyncLoop } from '@/features/tasks/ops/sync-loop';
 
 const HEARTBEAT_MS = 25_000;
 

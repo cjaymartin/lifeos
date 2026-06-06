@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { assembleCarts } from '@/lib/grocery';
-import { spawnGroceryJob } from '@/lib/grocery-runner';
+import { assembleCarts } from '@/features/grocery/ops';
+import { spawnGroceryJob } from '@/features/grocery/jobs';
 
 /**
  * POST /api/grocery/build-carts — optional { itemIds: string[] } limits the

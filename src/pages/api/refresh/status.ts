@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { stat } from 'fs/promises';
 import { join } from 'path';
-import { isPopulateDailyRunning } from '@/lib/populate-daily-runner';
+import { isPopulateDailyRunning } from '@/features/daily/jobs';
 
 const DATA = join(process.cwd(), 'src/content/daily/today.json');
 

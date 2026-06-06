@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { spawnPopulateDeliveries } from '@/lib/populate-deliveries-runner';
+import { spawnPopulateDeliveries } from '@/features/deliveries/jobs';
 
 export const POST: APIRoute = async ({ cookies }) => {
   const denied = requireSession(cookies);

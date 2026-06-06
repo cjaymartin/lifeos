@@ -2,9 +2,9 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import {
   loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, syncStapleToList, renameInProductMap,
-} from '@/lib/grocery';
-import { normalizeName, DEFAULT_CATEGORIES, STAPLE_STATUS_ORDER } from '@/lib/grocery-types';
-import type { RestockAt, Retailer, StapleStatus } from '@/lib/grocery-types';
+} from '@/features/grocery/ops';
+import { normalizeName, DEFAULT_CATEGORIES, STAPLE_STATUS_ORDER } from '@/features/grocery/types';
+import type { RestockAt, Retailer, StapleStatus } from '@/features/grocery/types';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });

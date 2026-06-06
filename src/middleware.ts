@@ -1,6 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import { hasSession } from '@/lib/auth';
-import { ensureSyncLoop } from '@/lib/tasks/sync-loop';
+import { ensureSyncLoop } from '@/features/tasks/ops/sync-loop';
 
 const PUBLIC = [
   '/login',

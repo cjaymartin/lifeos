@@ -5,11 +5,11 @@ import {
 } from 'lucide-react';
 import type {
   GroceryState, GroceryItem, Staple, StapleStatus, Retailer, CartsData, ProductRef, RestockAt,
-} from '@/lib/grocery-types';
+} from '@/features/grocery/types';
 import {
   DEFAULT_CATEGORIES, STAPLE_STATUS_LABELS, RETAILER_LABELS, RETAILER_CART_URLS,
   normalizeName, buildAddToCartUrl,
-} from '@/lib/grocery-types';
+} from '@/features/grocery/types';
 import { pollJob, watchFlagJob, type JobState, type JobHandle } from '@/lib/client/job-watch';
 import { makeOptimistic } from '@/lib/client/stack-client';
 import { groceryClient } from '@/features/grocery/client';

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { getSnapshot } from '@/lib/tasks/store';
-import { ensureSyncLoop, getSyncStatus, syncNow } from '@/lib/tasks/sync-loop';
+import { getSnapshot } from '@/features/tasks/ops/store';
+import { ensureSyncLoop, getSyncStatus, syncNow } from '@/features/tasks/ops/sync-loop';
 
 /** POST /api/tasks/sync — force an immediate sync pass */
 export const POST: APIRoute = async ({ cookies }) => {

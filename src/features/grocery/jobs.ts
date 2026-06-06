@@ -7,13 +7,13 @@ import {
   isAgentJobRunning,
   readAgentJobLog,
   type AgentJob,
-} from './jobs/runner.ts';
+} from '../../lib/jobs/runner.ts';
 
 const DIR = join(process.cwd(), 'src/content/grocery');
 
 export type GroceryJob = 'build-carts' | 'purchase-scan' | 'categorize';
 
-const JOBS: Record<GroceryJob, AgentJob> = {
+export const groceryJobs: Record<GroceryJob, AgentJob> = {
   // build-carts streams JSONL events to its log (--output-format stream-json)
   // so the UI can show live progress; parsed by /api/grocery/build-progress
   'build-carts': defineAgentJob({
@@ -60,10 +60,10 @@ const JOBS: Record<GroceryJob, AgentJob> = {
   }),
 };
 
-export const isJobRunning = (job: GroceryJob) => isAgentJobRunning(JOBS[job]);
+export const isJobRunning = (job: GroceryJob) => isAgentJobRunning(groceryJobs[job]);
 
 /** Fire-and-forget spawn — for the API routes. Returns immediately. */
-export const spawnGroceryJob = (job: GroceryJob) => startAgentJob(JOBS[job]);
+export const spawnGroceryJob = (job: GroceryJob) => startAgentJob(groceryJobs[job]);
 
 /** The build-carts stream-json log so far — for the progress route. */
-export const readBuildLog = () => readAgentJobLog(JOBS['build-carts']);
+export const readBuildLog = () => readAgentJobLog(groceryJobs['build-carts']);

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { spawnRelogin } from '@/lib/settings/verify-runner';
-import type { AccountId } from '@/lib/settings/settings-types';
+import { spawnRelogin } from '@/features/settings/ops/verify-runner';
+import type { AccountId } from '@/features/settings/ops/settings-types';
 
 export const POST: APIRoute = async ({ cookies, request }) => {
   const denied = requireSession(cookies);

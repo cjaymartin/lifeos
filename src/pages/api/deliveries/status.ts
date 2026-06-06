@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { stat } from 'fs/promises';
-import { DELIVERIES_FILE } from '@/lib/deliveries';
-import { isPopulateDeliveriesRunning } from '@/lib/populate-deliveries-runner';
+import { DELIVERIES_FILE } from '@/features/deliveries/ops';
+import { isPopulateDeliveriesRunning } from '@/features/deliveries/jobs';
 
 export const GET: APIRoute = async ({ cookies }) => {
   const denied = requireSession(cookies);

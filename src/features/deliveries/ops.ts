@@ -2,9 +2,9 @@
 // components; browser-safe types/constants are in src/lib/deliveries-types.ts.
 import { readFile, stat } from 'fs/promises';
 import { join } from 'path';
-import type { DeliveriesData } from '@/lib/deliveries-types';
+import type { DeliveriesData } from '@/features/deliveries/types';
 
-export type * from '@/lib/deliveries-types';
+export type * from '@/features/deliveries/types';
 
 export const DELIVERIES_FILE = join(process.cwd(), 'src/content/deliveries/deliveries.json');
 export const DISMISSED_FILE = join(process.cwd(), 'src/content/deliveries/dismissed.json');

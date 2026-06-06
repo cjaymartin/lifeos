@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import type { DueSpec, TaskPatch } from '@/lib/tasks/provider';
-import { getSnapshot } from '@/lib/tasks/store';
-import { getProvider, syncNow } from '@/lib/tasks/sync-loop';
+import type { DueSpec, TaskPatch } from '@/features/tasks/ops/provider';
+import { getSnapshot } from '@/features/tasks/ops/store';
+import { getProvider, syncNow } from '@/features/tasks/ops/sync-loop';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });

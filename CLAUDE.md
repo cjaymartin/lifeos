@@ -4,6 +4,12 @@
 
 This is **LifeOS**, a local-first personal dashboard. It uses Astro for the UI and local Markdown/JSON files in `src/content/` for the database.
 
+## Architecture: Features
+
+The unit of composition is the **Feature** — one folder under `src/features/<id>/` bundling an optional stack (sidebar entry + page + chat mount), optional dashboard widgets, an optional adapter (server ops + agent-job definitions + typed browser client), and an optional `chat.md` guiding the feature's chat assistant. The registry is `src/features/index.ts`; shared deep modules (agent-job runner, job-watch, stack-client, auth, content-store) live in `src/lib/`. Domain vocabulary: see `CONTEXT.md`.
+
+Tests: `npm test` (Vitest unit suite) and `npm run test:e2e` (Playwright against a sandboxed copy of `src/content/` — agents are shimmed, nothing real is spawned or mutated). Run both after structural changes.
+
 ## The Two Modes
 
 ### APP MODE

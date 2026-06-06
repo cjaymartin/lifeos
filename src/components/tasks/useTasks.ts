@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiCall, makeOptimistic } from '@/lib/client/stack-client';
-import type { CompletedTask, TasksSnapshot } from '@/lib/tasks/types';
+import type { CompletedTask, TasksSnapshot } from '@/features/tasks/ops/types';
 
 export interface SyncStatus {
   configured: boolean;

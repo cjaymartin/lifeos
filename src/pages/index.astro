@@ -1,10 +1,10 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro';
-import { stacks } from '@/lib/stacks';
+import { stacks } from '@/features';
 import RefreshButton from '@/components/RefreshButton';
-import { getSnapshot } from '@/lib/tasks/store';
-import { ensureSyncLoop, getSyncStatus } from '@/lib/tasks/sync-loop';
-import { loadDeliveries } from '@/lib/deliveries';
+import { getSnapshot } from '@/features/tasks/ops/store';
+import { ensureSyncLoop, getSyncStatus } from '@/features/tasks/ops/sync-loop';
+import { loadDeliveries } from '@/features/deliveries/ops';
 import { selectWidgets, type DailyData, type WidgetDef } from '@/lib/widgets';
 import { readFile } from 'fs/promises';
 import { join } from 'path';

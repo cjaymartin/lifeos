@@ -6,7 +6,7 @@ import {
   startAgentJob,
   runAgentJobBlocking,
   isAgentJobRunning,
-} from './jobs/runner.ts';
+} from '../../lib/jobs/runner.ts';
 
 export const populateDailyJob = defineAgentJob({
   name: 'populate-daily',

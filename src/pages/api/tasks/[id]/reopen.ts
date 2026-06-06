@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { getProvider, syncNow } from '@/lib/tasks/sync-loop';
+import { getProvider, syncNow } from '@/features/tasks/ops/sync-loop';
 
 /** POST /api/tasks/:id/reopen — uncomplete a task */
 export const POST: APIRoute = async ({ cookies, params }) => {

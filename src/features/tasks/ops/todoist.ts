@@ -8,7 +8,7 @@ import type {
   TaskProvider,
 } from './provider';
 import { ProviderError } from './provider';
-import { getAccountSecrets } from '../settings/secrets';
+import { getAccountSecrets } from '@/features/settings/ops/secrets';
 import type { CompletedTask, Label, Project, Section, Task, TaskDue } from './types';
 
 const API = 'https://api.todoist.com/api/v1';

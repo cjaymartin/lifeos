@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { getAccount } from '@/lib/settings/accounts';
-import { importCookies } from '@/lib/settings/browser-session';
-import { setAccountStatus } from '@/lib/settings/status';
-import type { AccountId } from '@/lib/settings/settings-types';
+import { getAccount } from '@/features/settings/ops/accounts';
+import { importCookies } from '@/features/settings/ops/browser-session';
+import { setAccountStatus } from '@/features/settings/ops/status';
+import type { AccountId } from '@/features/settings/ops/settings-types';
 
 /**
  * Tier-3 fallback: import pasted cookies into the retailer's persistent

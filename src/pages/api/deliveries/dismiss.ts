@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { readFile, writeFile } from 'fs/promises';
-import { DISMISSED_FILE } from '@/lib/deliveries';
+import { DISMISSED_FILE } from '@/features/deliveries/ops';
 
 const KEEP_MS = 45 * 24 * 60 * 60 * 1000; // prune dismissals older than 45 days
 

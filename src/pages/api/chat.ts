@@ -3,7 +3,7 @@ import { requireSession } from '@/lib/auth';
 import { join } from 'path';
 import { runAgentCapture } from '@/lib/jobs/runner';
 import { loadStackContent } from '@/lib/content-store';
-import { stacks, CHAT_BASE_TOOLS } from '@/lib/stacks';
+import { stacks, CHAT_BASE_TOOLS, loadChatGuide } from '@/features';
 
 export interface Proposal {
   summary: string;
@@ -58,7 +58,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // Phase 1: no writes — Claude proposes first. Phase 2: all tools after user approval.
   const tools = approved ? allTools : allTools.filter(t => t !== 'Write' && t !== 'Edit');
 
-  const stackContent = await loadStackContent(stackId);
+  const [stackContent, chatGuide] = await Promise.all([
+    loadStackContent(stackId),
+    loadChatGuide(stackId), // the feature's chat.md — schemas, hard rules
+  ]);
   const contentDir = join(process.cwd(), 'src/content', stackId);
 
   const historyText = history.slice(0, -1)
@@ -87,7 +90,7 @@ ${approved ? `- Write files in: ${contentDir}` : '- File writes require user app
 - Keep responses concise and friendly.
 
 ${writeGuidance}
-${stack?.chatGuidance ? `\nStack-specific guidance:\n${stack.chatGuidance}\n` : ''}
+${chatGuide ? `\nStack-specific guidance:\n${chatGuide}\n` : ''}
 Current ${stackLabel} content:
 ${stackContent}`;
 

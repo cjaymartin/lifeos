@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { loadSettingsSnapshot } from '@/lib/settings/account-info';
+import { loadSettingsSnapshot } from '@/features/settings/ops/account-info';
 
 export const GET: APIRoute = async ({ cookies }) => {
   const denied = requireSession(cookies);

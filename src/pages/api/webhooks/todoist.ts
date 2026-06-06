@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import type { APIRoute } from 'astro';
-import { syncNow } from '@/lib/tasks/sync-loop';
+import { syncNow } from '@/features/tasks/ops/sync-loop';
 
 /**
  * POST /api/webhooks/todoist — Todoist webhook receiver (the push half of

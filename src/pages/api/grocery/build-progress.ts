@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { basename } from 'path';
 import { requireSession } from '@/lib/auth';
-import { isJobRunning, readBuildLog } from '@/lib/grocery-runner';
+import { isJobRunning, readBuildLog } from '@/features/grocery/jobs';
 import { parseStreamEvents, type ProgressEvent } from '@/lib/jobs/runner';
 
 export type { ProgressEvent };

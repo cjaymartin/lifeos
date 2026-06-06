@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { stat } from 'fs/promises';
-import { GROCERY_FILE, CARTS_FILE } from '@/lib/grocery';
-import { isJobRunning } from '@/lib/grocery-runner';
+import { GROCERY_FILE, CARTS_FILE } from '@/features/grocery/ops';
+import { isJobRunning } from '@/features/grocery/jobs';
 
 async function mtime(path: string): Promise<number | null> {
   try { return (await stat(path)).mtimeMs; } catch { return null; }

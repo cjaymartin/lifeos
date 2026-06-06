@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Package, Undo2, ChevronRight } from 'lucide-react';
-import type { Delivery, DeliveriesData, DeliveryStatus } from '@/lib/deliveries-types';
-import { STATUS_ORDER, STATUS_LABELS } from '@/lib/deliveries-types';
+import type { Delivery, DeliveriesData, DeliveryStatus } from '@/features/deliveries/types';
+import { STATUS_ORDER, STATUS_LABELS } from '@/features/deliveries/types';
 import { watchRefreshJob, JOB_STATE_COLORS, type JobState } from '@/lib/client/job-watch';
 import { makeOptimistic } from '@/lib/client/stack-client';
 import { deliveriesClient } from '@/features/deliveries/client';

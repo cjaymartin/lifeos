@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { spawnGroceryJob } from '@/lib/grocery-runner';
+import { spawnGroceryJob } from '@/features/grocery/jobs';
 
 export const POST: APIRoute = async ({ cookies }) => {
   const denied = requireSession(cookies);

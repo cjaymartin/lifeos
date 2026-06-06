@@ -1,4 +1,4 @@
-import type { Task, TaskDue } from '@/lib/tasks/types';
+import type { Task, TaskDue } from '@/features/tasks/ops/types';
 
 // ─── Dates ───────────────────────────────────────────────────────────────────
 

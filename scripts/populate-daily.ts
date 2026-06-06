@@ -1,3 +1,3 @@
-import { runPopulateDaily } from '../src/lib/populate-daily-runner.ts';
+import { runPopulateDaily } from '../src/features/daily/jobs.ts';
 
 await runPopulateDaily();

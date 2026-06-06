@@ -1,7 +1,7 @@
 // Deliveries-scan agent job — definition only; all lock/spawn/log mechanics
 // live in the agent-job runner module.
 import { join } from 'path';
-import { defineAgentJob, startAgentJob, isAgentJobRunning } from './jobs/runner.ts';
+import { defineAgentJob, startAgentJob, isAgentJobRunning } from '../../lib/jobs/runner.ts';
 
 export const populateDeliveriesJob = defineAgentJob({
   name: 'populate-deliveries',

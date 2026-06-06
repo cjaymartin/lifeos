@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { checkoutItems, loadCarts, saveCarts } from '@/lib/grocery';
-import type { Retailer } from '@/lib/grocery-types';
+import { checkoutItems, loadCarts, saveCarts } from '@/features/grocery/ops';
+import type { Retailer } from '@/features/grocery/types';
 
 /**
  * POST /api/grocery/checkout

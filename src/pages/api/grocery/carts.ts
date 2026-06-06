@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { loadCarts, saveCarts, rebuildCartUrl } from '@/lib/grocery';
-import type { Retailer } from '@/lib/grocery-types';
+import { loadCarts, saveCarts, rebuildCartUrl } from '@/features/grocery/ops';
+import type { Retailer } from '@/features/grocery/types';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });

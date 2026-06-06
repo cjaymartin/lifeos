@@ -11,7 +11,7 @@ mkdirSync(DIR, { recursive: true });
 const realCwd = process.cwd();
 process.chdir(sandbox);
 
-const grocery = await import('@/lib/grocery');
+const grocery = await import('@/features/grocery/ops');
 
 afterAll(() => {
   process.chdir(realCwd);

@@ -4,10 +4,10 @@ import { readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import type {
   CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, ProductRef, PurchaseRecord, Retailer, Staple,
-} from '@/lib/grocery-types';
-import { buildAddToCartUrl, normalizeName, RETAILER_LABELS } from '@/lib/grocery-types';
+} from '@/features/grocery/types';
+import { buildAddToCartUrl, normalizeName, RETAILER_LABELS } from '@/features/grocery/types';
 
-export type * from '@/lib/grocery-types';
+export type * from '@/features/grocery/types';
 
 const DIR = join(process.cwd(), 'src/content/grocery');
 export const GROCERY_FILE = join(DIR, 'grocery.json');

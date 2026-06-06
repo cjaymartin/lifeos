@@ -3,7 +3,7 @@ import { AlertTriangle, KeyRound } from 'lucide-react';
 import AccountCard from './AccountCard';
 import { cn } from '@/lib/utils';
 import { pollJob, type JobHandle } from '@/lib/client/job-watch';
-import type { SettingsSnapshot } from '@/lib/settings/account-info';
+import type { SettingsSnapshot } from '@/features/settings/ops/account-info';
 
 // Tab shell — Logins & Sessions is the first of more settings tabs to come
 // (passkeys, widgets, …). Add new entries here as they're built.

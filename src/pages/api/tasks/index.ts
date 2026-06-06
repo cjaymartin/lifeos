@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { getSnapshot } from '@/lib/tasks/store';
-import { ensureSyncLoop, getProvider, getSyncStatus, syncNow } from '@/lib/tasks/sync-loop';
+import { getSnapshot } from '@/features/tasks/ops/store';
+import { ensureSyncLoop, getProvider, getSyncStatus, syncNow } from '@/features/tasks/ops/sync-loop';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });

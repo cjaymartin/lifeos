@@ -13,7 +13,7 @@ import * as icons from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import type { Stack } from '@/lib/stacks';
+import type { Stack } from '@/features';
 
 interface Props {
   stacks: Stack[];

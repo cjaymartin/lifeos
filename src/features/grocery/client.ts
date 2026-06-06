@@ -1,7 +1,7 @@
 // Typed client for the Grocery stack — the only place that knows the grocery
 // API routes' URLs and payload shapes. Components call named operations.
 import { apiCall } from '@/lib/client/stack-client';
-import type { GroceryState, GroceryItem, Retailer } from '@/lib/grocery-types';
+import type { GroceryState, GroceryItem, Retailer } from '@/features/grocery/types';
 
 export const groceryClient = {
   state: () => apiCall<GroceryState>('/api/grocery') as Promise<GroceryState>,

@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { getAccount } from '@/lib/settings/accounts';
-import { setAccountSecrets } from '@/lib/settings/secrets';
-import type { AccountId } from '@/lib/settings/settings-types';
+import { getAccount } from '@/features/settings/ops/accounts';
+import { setAccountSecrets } from '@/features/settings/ops/secrets';
+import type { AccountId } from '@/features/settings/ops/settings-types';
 
 /** Save (or clear) retailer credentials for tier-1 auto re-login. */
 export const POST: APIRoute = async ({ cookies, request }) => {

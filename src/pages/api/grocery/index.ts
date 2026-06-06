@@ -3,10 +3,10 @@ import { requireSession } from '@/lib/auth';
 import {
   loadGrocery, saveGrocery, loadStaples, loadGroceryState,
   categorizeHeuristic, makeItemId,
-} from '@/lib/grocery';
-import type { GroceryItem } from '@/lib/grocery-types';
-import { normalizeName, DEFAULT_CATEGORIES } from '@/lib/grocery-types';
-import { spawnGroceryJob } from '@/lib/grocery-runner';
+} from '@/features/grocery/ops';
+import type { GroceryItem } from '@/features/grocery/types';
+import { normalizeName, DEFAULT_CATEGORIES } from '@/features/grocery/types';
+import { spawnGroceryJob } from '@/features/grocery/jobs';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });

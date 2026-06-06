@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CalendarClock, Flag, Repeat, Tag, Trash2 } from 'lucide-react';
-import type { Project, Task } from '@/lib/tasks/types';
+import type { Project, Task } from '@/features/tasks/ops/types';
 import {
   formatDueLabel,
   formatTime,

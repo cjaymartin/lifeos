@@ -1,8 +1,8 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro';
 import TasksApp from '@/components/tasks/TasksApp';
-import { getSnapshot } from '@/lib/tasks/store';
-import { ensureSyncLoop, getSyncStatus } from '@/lib/tasks/sync-loop';
+import { getSnapshot } from '@/features/tasks/ops/store';
+import { ensureSyncLoop, getSyncStatus } from '@/features/tasks/ops/sync-loop';
 
 ensureSyncLoop();
 const snapshot = await getSnapshot();

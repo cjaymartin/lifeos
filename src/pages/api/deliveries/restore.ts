@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { readFile, writeFile } from 'fs/promises';
-import { DISMISSED_FILE } from '@/lib/deliveries';
+import { DISMISSED_FILE } from '@/features/deliveries/ops';
 
 interface Dismissal { id: string; dismissedAt: string }
 
