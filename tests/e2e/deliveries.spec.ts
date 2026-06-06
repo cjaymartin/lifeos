@@ -14,11 +14,19 @@ test.describe('deliveries stack', () => {
   });
 
   test('dismiss and restore a delivery round-trips', async ({ page }) => {
-    const dismissedJson = () =>
-      readSandboxJson<{ dismissed: { id: string }[] }>('src/content/deliveries/dismissed.json')
-        .dismissed;
+    // The server's write isn't atomic, so a poll can catch the file mid-write —
+    // treat an unparseable read as "not yet" rather than failing the poll.
+    const dismissedJson = () => {
+      try {
+        return readSandboxJson<{ dismissed: { id: string }[] }>(
+          'src/content/deliveries/dismissed.json',
+        ).dismissed;
+      } catch {
+        return null;
+      }
+    };
     const data = readSandboxJson<{ deliveries: any[] }>('src/content/deliveries/deliveries.json');
-    const already = new Set(dismissedJson().map((d) => d.id));
+    const already = new Set((dismissedJson() ?? []).map((d) => d.id));
     const target = data.deliveries?.find((d) => !already.has(d.id));
     test.skip(!target, 'no visible deliveries in fixture data');
     const before = already.size;
@@ -26,11 +34,11 @@ test.describe('deliveries stack', () => {
     await page.goto('/deliveries');
     await page.getByRole('button', { name: `Dismiss ${target!.vendor} delivery` }).first().click();
 
-    await expect.poll(() => dismissedJson().length).toBe(before + 1);
+    await expect.poll(() => dismissedJson()?.length ?? -1).toBe(before + 1);
 
     // Restore it — the dismissed section is collapsed behind a toggle
     await page.getByRole('button', { name: /^Dismissed \(\d+\)/ }).click();
     await page.getByRole('button', { name: `Restore ${target!.vendor} delivery` }).first().click();
-    await expect.poll(() => dismissedJson().length).toBe(before);
+    await expect.poll(() => dismissedJson()?.length ?? -1).toBe(before);
   });
 });
