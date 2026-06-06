@@ -121,3 +121,17 @@ describe('assembleCarts', () => {
     expect(lines.find((l: any) => l.itemId === 'b').qty).toBe(1);
   });
 });
+
+describe('loadCarts', () => {
+  it('normalizes agent-written carts that omit items/unmatched arrays', async () => {
+    // The /build-carts agent writes carts.json directly and may leave out
+    // arrays it has nothing for — loadCarts must default them.
+    writeJson('carts.json', {
+      builtAt: '2026-06-06T14:27:30.000Z',
+      carts: [{ retailer: 'walmart', label: 'Walmart', items: [{ itemId: 'x', name: 'X' }] }],
+    });
+    const data = await grocery.loadCarts();
+    expect(data?.carts[0].unmatched).toEqual([]);
+    expect(data?.carts[0].items).toHaveLength(1);
+  });
+});

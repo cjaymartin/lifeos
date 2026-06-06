@@ -50,7 +50,12 @@ export async function saveStaples(staples: Staple[]): Promise<void> {
 }
 
 export async function loadCarts(): Promise<CartsData | null> {
-  return readJson<CartsData>(CARTS_FILE);
+  const data = await readJson<CartsData>(CARTS_FILE);
+  if (!data) return null;
+  // carts.json is also written by the /build-carts agent, which may omit
+  // arrays it has nothing for — normalize so consumers can index them safely.
+  data.carts = (data.carts ?? []).map(c => ({ ...c, items: c.items ?? [], unmatched: c.unmatched ?? [] }));
+  return data;
 }
 
 export async function saveCarts(carts: CartsData | null): Promise<void> {
