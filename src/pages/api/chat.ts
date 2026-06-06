@@ -1,31 +1,13 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { runAgentCapture } from '@/lib/jobs/runner';
+import { loadStackContent } from '@/lib/content-store';
 import { stacks, CHAT_BASE_TOOLS } from '@/lib/stacks';
 
 export interface Proposal {
   summary: string;
   files: { path: string; description: string }[];
-}
-
-async function loadStackContent(stackId: string): Promise<string> {
-  const dir = join(process.cwd(), 'src/content', stackId);
-  try {
-    const entries = await readdir(dir);
-    const files = entries.filter(f => !f.startsWith('.') && f !== '.gitkeep' && (f.endsWith('.md') || f.endsWith('.json')));
-    if (files.length === 0) return '(no content yet)';
-    const contents = await Promise.all(
-      files.map(async f => {
-        const raw = await readFile(join(dir, f), 'utf-8');
-        return `### ${f}\n${raw}`;
-      })
-    );
-    return contents.join('\n\n---\n\n');
-  } catch {
-    return '(no content yet)';
-  }
 }
 
 function parseProposal(text: string): { cleanText: string; proposal?: Proposal } {

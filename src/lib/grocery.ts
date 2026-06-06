@@ -3,9 +3,9 @@
 import { readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import type {
-  CartsData, GroceryData, GroceryItem, GroceryState, ProductRef, PurchaseRecord, Retailer, Staple,
+  CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, ProductRef, PurchaseRecord, Retailer, Staple,
 } from '@/lib/grocery-types';
-import { buildAddToCartUrl, normalizeName } from '@/lib/grocery-types';
+import { buildAddToCartUrl, normalizeName, RETAILER_LABELS } from '@/lib/grocery-types';
 
 export type * from '@/lib/grocery-types';
 
@@ -195,6 +195,102 @@ export async function loadGroceryState(): Promise<GroceryState> {
   if (staplesDirty) await saveStaples(staples);
 
   return { lastUpdated: grocery.lastUpdated, items: grocery.items, staples, carts, productMap };
+}
+
+/* ── Cart assembly ─────────────────────────────────────────────────────────
+   The build-carts entry point. Resolves what it can instantly from the
+   product memory; queues only unknown items for the /build-carts agent via
+   cart-request.json. The API route stays a thin seam over this. */
+
+/** "2" → 2; "1 lb" / "2 dozen" → 1 (only bare integers are purchase counts) */
+function countQty(quantity?: string): number {
+  return quantity && /^\d+$/.test(quantity.trim()) ? Math.max(1, parseInt(quantity, 10)) : 1;
+}
+
+export interface CartAssembly {
+  /** Lines resolved instantly from the product memory (no agent). */
+  instant: number;
+  /** Items handed to the /build-carts agent via cart-request.json. */
+  queued: number;
+  /** The queued items' ids (already written to cart-request.json). */
+  agentItemIds: string[];
+}
+
+/**
+ * Assemble retailer carts for the unchecked list (optionally limited to
+ * `itemIds`):
+ * - Items already fully pushed to a retailer cart (addedQty >= qty) are
+ *   always excluded — building never re-adds what's in the cart.
+ * - Items with a product-map entry (pinned or learned) are resolved INSTANTLY
+ *   — the map caches productIds exactly for this. A buyFrom preference
+ *   overrides a cached product at the other retailer.
+ * - Only unknown items are queued for the agent (cart-request.json is always
+ *   rewritten so stale selections never leak into a later run).
+ */
+export async function assembleCarts(itemIds?: string[]): Promise<CartAssembly> {
+  const [grocery, prevCarts, productMap] = await Promise.all([
+    loadGrocery(), loadCarts(), loadProductMap(),
+  ]);
+
+  // Never rebuild lines that are already in the real retailer cart
+  const inCart = new Set<string>();
+  for (const c of prevCarts?.carts ?? [])
+    for (const m of c.items)
+      if (m.productId && (m.addedQty ?? 0) >= (m.qty ?? 1)) inCart.add(m.itemId);
+
+  let targets = grocery.items.filter(i => !i.checked && !inCart.has(i.id));
+  if (itemIds?.length) {
+    const sel = new Set(itemIds.map(String));
+    targets = targets.filter(i => sel.has(i.id));
+  }
+
+  // Instant resolution from the product memory
+  const agentItems: GroceryItem[] = [];
+  const carts: CartsData = prevCarts ?? { builtAt: '', carts: [] };
+  let instant = 0;
+
+  for (const item of targets) {
+    const ref = productMap[normalizeName(item.name)];
+    if (!ref) { agentItems.push(item); continue; }
+    // A buyFrom preference overrides a cached product at the other retailer
+    if (item.buyFrom && ref.retailer !== item.buyFrom) { agentItems.push(item); continue; }
+
+    let cart = carts.carts.find(c => c.retailer === ref.retailer);
+    if (!cart) {
+      cart = { retailer: ref.retailer, label: RETAILER_LABELS[ref.retailer], items: [], unmatched: [] };
+      carts.carts.push(cart);
+    }
+    const line: CartMatch = {
+      itemId: item.id,
+      name: item.name,
+      product: ref.product,
+      productUrl: ref.productUrl,
+      productId: ref.productId,
+      qty: countQty(item.quantity),
+      confidence: 'high',
+      source: 'reorder',
+    };
+    const idx = cart.items.findIndex(m => m.itemId === item.id);
+    // Spread keeps addedQty on a partially-added line (line has no addedQty key)
+    if (idx >= 0) cart.items[idx] = { ...cart.items[idx], ...line };
+    else cart.items.push(line);
+    instant++;
+  }
+
+  if (instant > 0) {
+    for (const c of carts.carts) c.cartUrl = rebuildCartUrl(c);
+    carts.builtAt = new Date().toISOString();
+    await saveCarts(carts);
+  }
+
+  if (agentItems.length > 0) {
+    // Stale selections must never leak into a later run — always rewritten
+    await writeJson(CART_REQUEST_FILE, { itemIds: agentItems.map(i => i.id) });
+  } else {
+    try { await unlink(CART_REQUEST_FILE); } catch {}
+  }
+
+  return { instant, queued: agentItems.length, agentItemIds: agentItems.map(i => i.id) };
 }
 
 /* ── Checkout ──────────────────────────────────────────────────────────────
