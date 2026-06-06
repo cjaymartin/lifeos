@@ -6,9 +6,12 @@
 //   node tests/qa/run.mjs [--skip-build] [--area grocery,tasks]
 //
 // Mutations only ever touch .test-sandbox/ — agent jobs hit the claude shim.
-// KNOWN LIMIT: the build bakes .env secrets (import.meta.env), so the local
-// sandbox can still reach real Todoist. Task mutations are therefore not
-// exercised — see the tasks area script.
+// Runtime secrets are read from process.env only (never the build-time
+// import.meta.env), so test-server.mjs's env scrub keeps the sandbox off the
+// real Todoist account even on a dev machine (NIM-7). The opt-in
+// `tasks-mutations` area exercises add/complete/edit/delete against an
+// in-memory fake backend; it's only selected via --area and flips the server
+// to LIFEOS_FAKE_TASKS=1.
 import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
@@ -24,8 +27,14 @@ const only = areaArg ? (areaArg.split('=')[1] ?? args[args.indexOf(areaArg) + 1]
 
 // Areas run in this order — auth first (cheap), theme last (it toggles
 // global state and restores it).
-const ORDER = ['auth', 'dashboard', 'tasks', 'grocery', 'deliveries', 'recipes', 'settings', 'chat', 'api', 'misc', 'theme'];
-const areas = ORDER.filter((a) => existsSync(join(here, 'scripts', `${a}.qa.mjs`)) && (!only || only.includes(a)));
+const ORDER = ['auth', 'dashboard', 'tasks', 'tasks-mutations', 'grocery', 'deliveries', 'recipes', 'settings', 'chat', 'api', 'misc', 'theme'];
+// Opt-in areas run only when explicitly named via --area — tasks-mutations
+// flips the whole server to the fake task provider (LIFEOS_FAKE_TASKS=1).
+const OPT_IN = new Set(['tasks-mutations']);
+const areas = ORDER.filter(
+  (a) => existsSync(join(here, 'scripts', `${a}.qa.mjs`)) && (only ? only.includes(a) : !OPT_IN.has(a)),
+);
+const fakeTasks = areas.includes('tasks-mutations');
 
 if (!skipBuild) {
   console.log('building…');
@@ -36,7 +45,7 @@ execSync('node tests/qa/scripts/mint-session.ts', { cwd: repo, stdio: 'inherit' 
 console.log(`starting test server on :${PORT}…`);
 const server = spawn('node', ['scripts/test-server.mjs'], {
   cwd: repo,
-  env: { ...process.env, LIFEOS_TEST_PORT: PORT },
+  env: { ...process.env, LIFEOS_TEST_PORT: PORT, ...(fakeTasks ? { LIFEOS_FAKE_TASKS: '1' } : {}) },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverLog = '';

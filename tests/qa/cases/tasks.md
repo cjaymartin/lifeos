@@ -1,11 +1,14 @@
 # QA cases — tasks stack
 
-Automated by `tests/qa/scripts/tasks.qa.mjs`.
+Read-only cases automated by `tests/qa/scripts/tasks.qa.mjs`; mutation cases
+(`TASK-M1/M2`) by `tests/qa/scripts/tasks-mutations.qa.mjs`.
 
-> **Mutations are NOT exercised.** The local build bakes the real
-> `TODOIST_API_TOKEN` via `import.meta.env`, so add/complete/edit/delete from
-> the sandbox would write to the real Todoist account. See the e2e-isolation
-> issue (#6). Until that's fixed, mutation coverage is manual-only.
+> **Mutations now run against an in-memory fake provider, never real Todoist.**
+> Runtime secrets are read from `process.env` only (not the baked
+> `import.meta.env`), so the default sandbox shows Todoist as "Not connected"
+> even on a dev machine (NIM-7). The opt-in `tasks-mutations` area sets
+> `LIFEOS_FAKE_TASKS=1` to exercise add/complete/edit/delete safely:
+> `node tests/qa/run.mjs --area tasks-mutations`.
 
 ### TASK-1 — page renders with view navigation and sync status
 Steps: load `/tasks`.
@@ -57,12 +60,14 @@ Steps: cycle all four views.
 Expected: zero console errors.
 Last pass: 2026-06-06 · Status: pass
 
-### TASK-M1 — quick-add creates a task (real Todoist)
-Steps: manual, on the live instance — add a task via quick-add.
-Expected: appears in Todoist and in the mirror after sync.
-Last pass: never · Status: manual
+### TASK-M1 — quick-add creates a task (fake provider)
+Steps: POST `/api/tasks`, then load the project view. Requires the
+`tasks-mutations` area (`LIFEOS_FAKE_TASKS=1`).
+Expected: task persists to the sandbox mirror and renders in its project.
+Last pass: 2026-06-06 · Status: pass
 
-### TASK-M2 — complete / reopen / edit / delete round-trip (real Todoist)
-Steps: manual, on the live instance.
-Expected: mutations propagate to Todoist and back through sync.
-Last pass: never · Status: manual
+### TASK-M2 — complete / reopen / edit / delete round-trip (fake provider)
+Steps: PATCH content+priority, complete, reopen, delete via the API; assert the
+mirror after each. Requires the `tasks-mutations` area.
+Expected: each mutation round-trips through the sync path into the mirror.
+Last pass: 2026-06-06 · Status: pass

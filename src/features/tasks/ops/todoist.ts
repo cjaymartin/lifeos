@@ -326,7 +326,10 @@ export function getTodoistToken(): string | null {
     const stored = getAccountSecrets('todoist').token ?? '';
     if (stored.trim()) return stored.trim();
   } catch {}
-  const token =
-    (import.meta as any).env?.TODOIST_API_TOKEN ?? process.env.TODOIST_API_TOKEN ?? '';
+  // process.env ONLY — never import.meta.env. `astro build` inlines import.meta.env
+  // values into dist/, which would bake a dev machine's real .env token into the
+  // build and defeat the test-server env scrub (NIM-7). The container passes the
+  // token at runtime via env_file anyway.
+  const token = process.env.TODOIST_API_TOKEN ?? '';
   return token.trim() ? token.trim() : null;
 }
