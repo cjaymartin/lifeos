@@ -10,8 +10,7 @@ import {
   DEFAULT_CATEGORIES, STAPLE_STATUS_LABELS, RETAILER_LABELS, RETAILER_CART_URLS,
   normalizeName, buildAddToCartUrl,
 } from '@/lib/grocery-types';
-
-type JobState = 'idle' | 'loading' | 'done' | 'error';
+import { pollJob, watchFlagJob, type JobState, type JobHandle } from '@/lib/client/job-watch';
 
 interface ProgressEvent { t: 'tool' | 'note' | 'result'; label: string }
 interface BuildProgress { running: boolean; events: ProgressEvent[]; done: boolean; ok: boolean | null }
@@ -304,8 +303,7 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
   const [progress, setProgress] = useState<BuildProgress | null>(null);
   const [instantCount, setInstantCount] = useState(0);
   const [buildElapsed, setBuildElapsed] = useState(0);
-  const pollRef = useRef<number | null>(null);
-  const buildPollRef = useRef<number | null>(null);
+  const buildPollRef = useRef<JobHandle | null>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -313,8 +311,7 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
     setStapleCollapsed(loadCollapsed(STAPLES_COLLAPSE_KEY));
   }, []);
   useEffect(() => () => {
-    if (pollRef.current) clearTimeout(pollRef.current);
-    if (buildPollRef.current) clearTimeout(buildPollRef.current);
+    buildPollRef.current?.cancel();
   }, []);
 
   // Elapsed clock + feed auto-scroll while a build runs
@@ -347,17 +344,14 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
 
   // Poll while the categorize micro-agent runs, then refetch to pick up categories
   const pollCategorize = useCallback(() => {
-    let attempts = 0;
-    const poll = async () => {
-      if (++attempts > 20) return; // ~80s max
-      try {
-        const r = await fetch('/api/grocery/status');
-        const { categorizing } = await r.json() as { categorizing: boolean };
-        if (!categorizing && attempts > 1) { await refetch(); return; }
-      } catch { return; }
-      pollRef.current = window.setTimeout(poll, 4000);
-    };
-    pollRef.current = window.setTimeout(poll, 5000);
+    void watchFlagJob({
+      statusUrl: '/api/grocery/status',
+      flag: 'categorizing',
+      firstDelayMs: 5000,
+      intervalMs: 4000,
+      maxAttempts: 20, // ~80s max
+      minAttempts: 1,
+    }).then(result => { if (result === 'done') void refetch(); });
   }, [refetch]);
 
   const addItem = useCallback(async () => {
@@ -536,24 +530,22 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
       setBuildModal(true);
       if (instant > 0) refetch(); // show the instant lines right away
 
-      let attempts = 0;
-      const MAX = 200; // ~6.5 min at 2s
-      const poll = async (): Promise<void> => {
-        if (++attempts > MAX) { setBuildState('error'); return; }
-        try {
-          const r = await fetch('/api/grocery/build-progress');
-          const p = await r.json() as BuildProgress;
-          setProgress(p);
-          if (p.done || (!p.running && attempts > 4)) {
-            await refetch();
-            setBuildState(p.ok === false ? 'error' : 'done');
-            setTimeout(() => setBuildState('idle'), 2500);
-            return;
-          }
-        } catch {}
-        buildPollRef.current = window.setTimeout(poll, 2000);
-      };
-      buildPollRef.current = window.setTimeout(poll, 1500);
+      let last: BuildProgress | null = null;
+      buildPollRef.current = pollJob<BuildProgress>({
+        statusUrl: '/api/grocery/build-progress',
+        firstDelayMs: 1500,
+        intervalMs: 2000,
+        maxAttempts: 200, // ~6.5 min at 2s
+        fetchError: 'continue', // a blip mid-build keeps the feed alive
+        onStatus: (p) => { last = p; setProgress(p); },
+        verdict: (p, { attempts }) =>
+          p.done || (!p.running && attempts > 4) ? 'done' : 'pending',
+      });
+      const result = await buildPollRef.current.result;
+      if (result === 'error') { setBuildState('error'); return; }
+      await refetch();
+      setBuildState(last !== null && (last as BuildProgress).ok === false ? 'error' : 'done');
+      setTimeout(() => setBuildState('idle'), 2500);
     } catch {
       setBuildState('error');
     }
@@ -575,23 +567,15 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
       });
       if (!res.ok) { setJobState('error'); return; }
 
-      let attempts = 0;
-      const MAX = 75; // 5 min
-      const poll = async (): Promise<void> => {
-        if (++attempts > MAX) { setJobState('error'); return; }
-        try {
-          const r = await fetch('/api/grocery/status');
-          const status = await r.json() as Record<string, boolean>;
-          if (!status[runningKey] && attempts > 2) {
-            await refetch();
-            setJobState('done');
-            setTimeout(() => setJobState('idle'), 2500);
-          } else {
-            setTimeout(poll, 4000);
-          }
-        } catch { setJobState('error'); }
-      };
-      setTimeout(poll, 8000);
+      const result = await watchFlagJob({
+        statusUrl: '/api/grocery/status',
+        flag: runningKey,
+        maxAttempts: 75, // 5 min
+      });
+      if (result === 'error') { setJobState('error'); return; }
+      await refetch();
+      setJobState('done');
+      setTimeout(() => setJobState('idle'), 2500);
     } catch { setJobState('error'); }
   }, [refetch]);
 

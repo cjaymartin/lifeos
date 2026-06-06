@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, KeyRound } from 'lucide-react';
 import AccountCard from './AccountCard';
 import { cn } from '@/lib/utils';
+import { pollJob, type JobHandle } from '@/lib/client/job-watch';
 import type { SettingsSnapshot } from '@/lib/settings/account-info';
 
 // Tab shell — Logins & Sessions is the first of more settings tabs to come
@@ -15,7 +16,7 @@ interface Props {
 export default function SettingsApp({ initial }: Props) {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot>(initial);
   const [tab] = useState<(typeof TABS)[number]['id']>('logins');
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollHandle = useRef<JobHandle | null>(null);
 
   const refresh = useCallback(async (): Promise<SettingsSnapshot | null> => {
     try {
@@ -31,18 +32,20 @@ export default function SettingsApp({ initial }: Props) {
 
   // Poll every 4s while any job is in flight (MCP probes can take ~90s).
   const schedulePoll = useCallback(() => {
-    if (pollTimer.current) clearTimeout(pollTimer.current);
-    pollTimer.current = setTimeout(async () => {
-      const data = await refresh();
-      if (data?.accounts.some((a) => a.running)) schedulePoll();
-    }, 4000);
-  }, [refresh]);
+    pollHandle.current?.cancel();
+    pollHandle.current = pollJob<SettingsSnapshot>({
+      statusUrl: '/api/settings/accounts',
+      firstDelayMs: 4000,
+      intervalMs: 4000,
+      maxAttempts: Number.POSITIVE_INFINITY,
+      onStatus: setSnapshot,
+      verdict: (s) => (s.accounts.some((a) => a.running) ? 'pending' : 'done'),
+    });
+  }, []);
 
   useEffect(() => {
     if (initial.accounts.some((a) => a.running)) schedulePoll();
-    return () => {
-      if (pollTimer.current) clearTimeout(pollTimer.current);
-    };
+    return () => pollHandle.current?.cancel();
   }, [initial, schedulePoll]);
 
   const onJobStarted = useCallback(

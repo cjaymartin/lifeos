@@ -16,6 +16,16 @@ test.describe('dashboard', () => {
     }
   });
 
+  test('refresh button walks the job state machine (shimmed agent → Failed)', async ({ page }) => {
+    test.slow(); // first status poll happens 8s after trigger
+    await page.goto('/');
+    await page.getByRole('button', { name: /refresh/i }).click();
+    await expect(page.getByRole('button', { name: /Refreshing…/ })).toBeVisible();
+    // The claude shim exits instantly without rewriting today.json, so the
+    // watcher's "process exited but file unchanged" rule must report failure.
+    await expect(page.getByRole('button', { name: /Failed/ })).toBeVisible({ timeout: 25_000 });
+  });
+
   test('widget cards from the registry render', async ({ page }) => {
     const registry = (await import('./helpers')).readSandboxJson<{ widgets: any[] }>(
       'src/content/widgets/registry.json',

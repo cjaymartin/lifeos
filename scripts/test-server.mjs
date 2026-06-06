@@ -10,7 +10,7 @@
 // Env is scrubbed so no real provider (Todoist, encrypted secrets) is ever
 // reachable from tests — the sync loop no-ops without a token.
 
-import { cpSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { cpSync, mkdirSync, rmSync, readFileSync, writeFileSync, globSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
@@ -31,6 +31,14 @@ const sandbox = join(repo, '.test-sandbox');
 rmSync(sandbox, { recursive: true, force: true });
 mkdirSync(join(sandbox, 'src'), { recursive: true });
 cpSync(join(repo, 'src/content'), join(sandbox, 'src/content'), { recursive: true });
+
+// Scrub job dot-files copied from the real tree — a fresh lock left by a real
+// agent run would make every job read as already-running inside tests.
+for (const f of globSync(join(sandbox, 'src/content/**/.*'))) {
+  if (/\.(refresh|build|scan|categorize|probe)-|-lock$|-log$|\.job-/.test(f)) {
+    rmSync(f, { force: true, recursive: true });
+  }
+}
 
 // Shim `claude` so no agent job can ever spawn a real (billable) agent from
 // a test — the shim exits 0 immediately, so runners release locks normally.

@@ -2,8 +2,7 @@ import { useState, useCallback } from 'react';
 import { RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Package, Undo2, ChevronRight } from 'lucide-react';
 import type { Delivery, DeliveriesData, DeliveryStatus } from '@/lib/deliveries-types';
 import { STATUS_ORDER, STATUS_LABELS } from '@/lib/deliveries-types';
-
-type RefreshState = 'idle' | 'loading' | 'done' | 'error';
+import { watchRefreshJob, JOB_STATE_COLORS, type JobState } from '@/lib/client/job-watch';
 
 const STATUS_BADGE: Record<DeliveryStatus, string> = {
   'out-for-delivery': 'bg-warning-subtle text-warning',
@@ -120,7 +119,7 @@ function DeliveryRow({ d, onDismiss, onRestore }: {
 
 export default function DeliveriesApp({ initial }: { initial: DeliveriesData | null }) {
   const [data, setData] = useState<DeliveriesData | null>(initial);
-  const [state, setState] = useState<RefreshState>('idle');
+  const [state, setState] = useState<JobState>('idle');
   const [showDismissed, setShowDismissed] = useState(false);
 
   const handleDismiss = useCallback(async (id: string) => {
@@ -167,49 +166,16 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
     if (state === 'loading') return;
     setState('loading');
 
-    try {
-      const before = await fetch('/api/deliveries/status');
-      const { lastUpdated: initialMtime } = await before.json() as { lastUpdated: number | null };
-
-      const res = await fetch('/api/deliveries/refresh', { method: 'POST' });
-      if (!res.ok) { setState('error'); return; }
-
-      // Poll every 4s; first check after 8s (Claude startup + first tool call)
-      let attempts = 0;
-      const MAX = 60; // 4 min max
-
-      const poll = async (): Promise<void> => {
-        if (++attempts > MAX) { setState('error'); return; }
-        try {
-          const r = await fetch('/api/deliveries/status');
-          const { running, lastUpdated } = await r.json() as { running: boolean; lastUpdated: number | null };
-
-          if (lastUpdated !== initialMtime) {
-            setState('done');
-            setTimeout(() => window.location.reload(), 800);
-          } else if (!running && attempts > 2) {
-            setState('error');
-          } else {
-            setTimeout(poll, 4000);
-          }
-        } catch {
-          setState('error');
-        }
-      };
-
-      setTimeout(poll, 8000);
-    } catch {
-      setState('error');
-    }
+    const result = await watchRefreshJob({
+      statusUrl: '/api/deliveries/status',
+      triggerUrl: '/api/deliveries/refresh',
+    });
+    setState(result);
+    if (result === 'done') setTimeout(() => window.location.reload(), 800);
   }, [state]);
 
   const label  = { idle: 'Refresh', loading: 'Scanning Gmail…', done: 'Done', error: 'Failed' }[state];
-  const colors = {
-    idle:    'border-border text-muted-foreground hover:text-foreground hover:bg-accent/30',
-    loading: 'border-border text-muted-foreground cursor-wait',
-    done:    'border-emerald-500/30 text-emerald-500 bg-emerald-500/10',
-    error:   'border-destructive/30 text-destructive bg-destructive/10',
-  }[state];
+  const colors = JOB_STATE_COLORS[state];
 
   const deliveries = data?.deliveries ?? [];
   const dismissed = data?.dismissed ?? [];
