@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
-import { spawn } from 'child_process';
+import { runAgentCapture } from '@/lib/jobs/runner';
 
 const RECIPES_DIR = join(process.cwd(), 'src/content/recipes');
 
@@ -19,40 +19,6 @@ async function loadRecipes(): Promise<string> {
   } catch {
     return '(no recipes found)';
   }
-}
-
-function runClaude(prompt: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: string[] = [];
-    const proc = spawn(
-      'claude',
-      [
-        '-p', prompt,
-        // Edit included — models reach for Edit on existing files, and a
-        // denied edit headless leads to falsely-claimed success
-        '--allowedTools', 'Write Edit Read',
-        '--output-format', 'text',
-      ],
-      {
-        cwd: process.cwd(),
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
-        // detached → own process group: claude's exit-time cleanup signals
-        // can never reach the server
-        detached: true,
-      }
-    );
-
-    proc.stdout.on('data', (d: Buffer) => chunks.push(d.toString()));
-    // 60-second timeout
-    const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 60_000);
-    proc.on('close', code => {
-      clearTimeout(timer);
-      if (code === 0 || chunks.length > 0) resolve(chunks.join('').trim());
-      else reject(new Error(`claude exited with code ${code}`));
-    });
-    proc.on('error', err => { clearTimeout(timer); reject(err); });
-  });
 }
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -113,7 +79,13 @@ Instructions:
 - Keep responses concise and practical.`;
 
   try {
-    const reply = await runClaude(prompt);
+    // Edit included — models reach for Edit on existing files, and a denied
+    // edit headless leads to falsely-claimed success
+    const reply = await runAgentCapture({
+      prompt,
+      allowedTools: ['Write', 'Edit', 'Read'],
+      timeoutMs: 60_000,
+    });
     return new Response(JSON.stringify({ reply }), {
       headers: { 'Content-Type': 'application/json' },
     });

@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
-import { spawn } from 'child_process';
+import { runAgentCapture } from '@/lib/jobs/runner';
 import { stacks, CHAT_BASE_TOOLS } from '@/lib/stacks';
 
 export interface Proposal {
@@ -50,27 +50,6 @@ function parseProposal(text: string): { cleanText: string; proposal?: Proposal }
   } catch {
     return { cleanText: text };
   }
-}
-
-function runClaude(prompt: string, tools: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: string[] = [];
-    const proc = spawn(
-      'claude',
-      ['-p', prompt, '--allowedTools', tools.join(','), '--output-format', 'text'],
-      // detached → own process group: claude's exit-time cleanup signals can
-      // never reach the server (an attached claude SIGTERM'd the whole app)
-      { cwd: process.cwd(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env }, detached: true }
-    );
-    proc.stdout.on('data', (d: Buffer) => chunks.push(d.toString()));
-    const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout after 5 minutes')); }, 300_000);
-    proc.on('close', code => {
-      clearTimeout(timer);
-      if (code === 0 || chunks.length > 0) resolve(chunks.join('').trim());
-      else reject(new Error(`claude exited with code ${code}`));
-    });
-    proc.on('error', err => { clearTimeout(timer); reject(err); });
-  });
 }
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -137,7 +116,7 @@ ${historyText ? `Conversation so far:\n${historyText}\n\n` : ''}User: ${message}
 Today's date: ${new Date().toISOString().slice(0, 10)}`;
 
   try {
-    const raw = await runClaude(fullPrompt, tools);
+    const raw = await runAgentCapture({ prompt: fullPrompt, allowedTools: tools });
 
     if (!approved) {
       const { cleanText, proposal } = parseProposal(raw);
