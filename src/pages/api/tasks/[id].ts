@@ -1,14 +1,11 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
-import type { DueSpec, TaskPatch } from '@/lib/tasks/provider';
-import { getSnapshot } from '@/lib/tasks/store';
-import { getProvider, syncNow } from '@/lib/tasks/sync-loop';
+import { requireSession } from '@/lib/auth';
+import type { DueSpec, TaskPatch } from '@/features/tasks/ops/provider';
+import { getSnapshot } from '@/features/tasks/ops/store';
+import { getProvider, syncNow } from '@/features/tasks/ops/sync-loop';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-
-const authorized = (cookies: any) =>
-  verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? '');
 
 /**
  * PATCH /api/tasks/:id — update fields and/or move.
@@ -19,7 +16,8 @@ const authorized = (cookies: any) =>
  * by carrying the existing natural-language string along.
  */
 export const PATCH: APIRoute = async ({ cookies, params, request }) => {
-  if (!authorized(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
   const provider = getProvider();
   if (!provider) return json({ error: 'No task provider configured — set TODOIST_API_TOKEN' }, 503);
 
@@ -70,7 +68,8 @@ export const PATCH: APIRoute = async ({ cookies, params, request }) => {
 
 /** DELETE /api/tasks/:id */
 export const DELETE: APIRoute = async ({ cookies, params }) => {
-  if (!authorized(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
   const provider = getProvider();
   if (!provider) return json({ error: 'No task provider configured — set TODOIST_API_TOKEN' }, 503);
 

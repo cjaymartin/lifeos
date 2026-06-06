@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { AccountInfo, VerifyState } from '@/lib/settings/settings-types';
+import type { AccountInfo, VerifyState } from '@/features/settings/ops/settings-types';
 
 function AccountIcon({ name }: { name: string }) {
   const Icon = (icons as unknown as Record<string, LucideIcon>)[name];

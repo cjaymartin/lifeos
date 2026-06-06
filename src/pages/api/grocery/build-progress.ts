@@ -1,13 +1,10 @@
 import type { APIRoute } from 'astro';
-import { readFile } from 'fs/promises';
 import { basename } from 'path';
-import { verifySession } from '@/lib/auth';
-import { BUILD_LOG, isJobRunning } from '@/lib/grocery-runner';
+import { requireSession } from '@/lib/auth';
+import { isJobRunning, readBuildLog } from '@/features/grocery/jobs';
+import { parseStreamEvents, type ProgressEvent } from '@/lib/jobs/runner';
 
-export interface ProgressEvent {
-  t: 'tool' | 'note' | 'result';
-  label: string;
-}
+export type { ProgressEvent };
 
 const trunc = (s: unknown, n: number) => {
   const str = String(s ?? '').trim();
@@ -15,6 +12,7 @@ const trunc = (s: unknown, n: number) => {
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/** Grocery-flavoured labels for the cart-build progress feed. */
 function toolLabel(name: string, input: any): string {
   switch (name) {
     case 'WebSearch':
@@ -39,46 +37,17 @@ function toolLabel(name: string, input: any): string {
   }
 }
 
-/** Parse claude's stream-json log into a friendly event feed. */
-function parseEvents(raw: string): { events: ProgressEvent[]; done: boolean; ok: boolean | null } {
-  const events: ProgressEvent[] = [];
-  let done = false;
-  let ok: boolean | null = null;
-
-  for (const line of raw.split('\n')) {
-    const s = line.trim();
-    if (!s.startsWith('{')) continue;
-    let j: any;
-    try { j = JSON.parse(s); } catch { continue; }
-
-    if (j.type === 'assistant') {
-      for (const block of j.message?.content ?? []) {
-        if (block.type === 'tool_use') {
-          events.push({ t: 'tool', label: toolLabel(block.name, block.input) });
-        } else if (block.type === 'text' && block.text?.trim()) {
-          // The agent narrating its plan — first line only, kept short
-          events.push({ t: 'note', label: trunc(block.text.split('\n')[0], 90) });
-        }
-      }
-    } else if (j.type === 'result') {
-      done = true;
-      ok = j.subtype === 'success' && !j.is_error;
-      events.push({ t: 'result', label: ok ? 'Cart ready' : 'Build failed — check the cart card or retry' });
-    }
-  }
-
-  return { events: events.slice(-60), done, ok };
-}
-
 export const GET: APIRoute = async ({ cookies }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
-  const running = await isJobRunning('build-carts');
-  let raw = '';
-  try { raw = await readFile(BUILD_LOG, 'utf-8'); } catch {}
+  const [running, raw] = await Promise.all([isJobRunning('build-carts'), readBuildLog()]);
 
-  const { events, done, ok } = parseEvents(raw);
+  const { events, done, ok } = parseStreamEvents(raw, {
+    toolLabel,
+    resultLabels: { ok: 'Cart ready', fail: 'Build failed — check the cart card or retry' },
+  });
+
   return new Response(JSON.stringify({ running, events, done, ok }), {
     headers: { 'Content-Type': 'application/json' },
   });

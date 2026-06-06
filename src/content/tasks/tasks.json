@@ -1,8 +1,8 @@
 {
   "provider": "todoist",
-  "syncToken": "QriT0KhK-hCZs_aJf7dAJ8Y8JEvAl5p65QeQ_qGYNLN3q0kQmDl_VcRsssb-iCZo-r_AcSYkLRELlrF8drGFR5TYeW42cX1zT0kbCXzpklggxCUx",
-  "lastSyncAt": "2026-06-05T18:15:58.066Z",
-  "version": 3035,
+  "syncToken": "XXLAbjt7QmU1z_Cbz93mp8F9s52LMXxZh3YFDI5aEV3XatAsHalYjzo-FCcNoSAsqRjchzKL14H1EdrCzKTYxmMhEAZ6YeY1I3wpaSoPEFz09rwk",
+  "lastSyncAt": "2026-06-06T13:03:26.763Z",
+  "version": 5217,
   "tasks": [
     {
       "id": "6fxpWRM52Jv6Rq66",
@@ -36,7 +36,7 @@
       "priority": 2,
       "labels": [],
       "due": {
-        "date": "2026-06-05",
+        "date": "2026-06-06",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -162,7 +162,7 @@
       "priority": 1,
       "labels": [],
       "due": {
-        "date": "2026-06-05",
+        "date": "2026-06-06",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -183,7 +183,7 @@
       "priority": 1,
       "labels": [],
       "due": {
-        "date": "2026-06-06",
+        "date": "2026-06-07",
         "hasTime": false,
         "timezone": null,
         "recurring": true,

@@ -1,7 +1,7 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro';
 import GroceryApp from '@/components/grocery/GroceryApp';
-import { loadGroceryState } from '@/lib/grocery';
+import { loadGroceryState } from '@/features/grocery/ops';
 
 const initial = await loadGroceryState();
 ---

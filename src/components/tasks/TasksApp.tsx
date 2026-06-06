@@ -10,7 +10,7 @@ import {
   Sun,
   Tag,
 } from 'lucide-react';
-import type { CompletedTask, Project, Task } from '@/lib/tasks/types';
+import type { CompletedTask, Project, Task } from '@/features/tasks/ops/types';
 import QuickAdd from './QuickAdd';
 import TaskItem from './TaskItem';
 import {

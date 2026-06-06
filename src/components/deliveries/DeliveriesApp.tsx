@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Package, Undo2, ChevronRight } from 'lucide-react';
-import type { Delivery, DeliveriesData, DeliveryStatus } from '@/lib/deliveries-types';
-import { STATUS_ORDER, STATUS_LABELS } from '@/lib/deliveries-types';
-
-type RefreshState = 'idle' | 'loading' | 'done' | 'error';
+import type { Delivery, DeliveriesData, DeliveryStatus } from '@/features/deliveries/types';
+import { STATUS_ORDER, STATUS_LABELS } from '@/features/deliveries/types';
+import { watchRefreshJob, JOB_STATE_COLORS, type JobState } from '@/lib/client/job-watch';
+import { makeOptimistic } from '@/lib/client/stack-client';
+import { deliveriesClient } from '@/features/deliveries/client';
 
 const STATUS_BADGE: Record<DeliveryStatus, string> = {
   'out-for-delivery': 'bg-warning-subtle text-warning',
@@ -120,12 +121,24 @@ function DeliveryRow({ d, onDismiss, onRestore }: {
 
 export default function DeliveriesApp({ initial }: { initial: DeliveriesData | null }) {
   const [data, setData] = useState<DeliveriesData | null>(initial);
-  const [state, setState] = useState<RefreshState>('idle');
+  const [state, setState] = useState<JobState>('idle');
   const [showDismissed, setShowDismissed] = useState(false);
 
-  const handleDismiss = useCallback(async (id: string) => {
+  const mutate = useMemo(
+    () =>
+      makeOptimistic<DeliveriesData | null>({
+        apply: (updater) => setData(updater),
+        // No GET endpoint for deliveries (the page SSRs its data) — server
+        // truth is a reload. Rollback: a failed dismiss/restore no longer
+        // leaves the UI lying.
+        refetch: async () => window.location.reload(),
+      }),
+    [],
+  );
+
+  const handleDismiss = useCallback((id: string) =>
     // Optimistic move to dismissed; the sync skill also honours dismissed.json
-    setData(d => {
+    mutate(d => {
       if (!d) return d;
       const item = d.deliveries.find(x => x.id === id);
       return {
@@ -133,19 +146,11 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
         deliveries: d.deliveries.filter(x => x.id !== id),
         dismissed: item ? [...(d.dismissed ?? []), item] : d.dismissed,
       };
-    });
-    try {
-      await fetch('/api/deliveries/dismiss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-    } catch {}
-  }, []);
+    }, () => deliveriesClient.dismiss(id)), [mutate]);
 
-  const handleRestore = useCallback(async (id: string) => {
+  const handleRestore = useCallback((id: string) =>
     // Optimistic move back to active
-    setData(d => {
+    mutate(d => {
       if (!d) return d;
       const item = (d.dismissed ?? []).find(x => x.id === id);
       return {
@@ -153,63 +158,22 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
         deliveries: item ? [...d.deliveries, item] : d.deliveries,
         dismissed: (d.dismissed ?? []).filter(x => x.id !== id),
       };
-    });
-    try {
-      await fetch('/api/deliveries/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-    } catch {}
-  }, []);
+    }, () => deliveriesClient.restore(id)), [mutate]);
 
   const handleRefresh = useCallback(async () => {
     if (state === 'loading') return;
     setState('loading');
 
-    try {
-      const before = await fetch('/api/deliveries/status');
-      const { lastUpdated: initialMtime } = await before.json() as { lastUpdated: number | null };
-
-      const res = await fetch('/api/deliveries/refresh', { method: 'POST' });
-      if (!res.ok) { setState('error'); return; }
-
-      // Poll every 4s; first check after 8s (Claude startup + first tool call)
-      let attempts = 0;
-      const MAX = 60; // 4 min max
-
-      const poll = async (): Promise<void> => {
-        if (++attempts > MAX) { setState('error'); return; }
-        try {
-          const r = await fetch('/api/deliveries/status');
-          const { running, lastUpdated } = await r.json() as { running: boolean; lastUpdated: number | null };
-
-          if (lastUpdated !== initialMtime) {
-            setState('done');
-            setTimeout(() => window.location.reload(), 800);
-          } else if (!running && attempts > 2) {
-            setState('error');
-          } else {
-            setTimeout(poll, 4000);
-          }
-        } catch {
-          setState('error');
-        }
-      };
-
-      setTimeout(poll, 8000);
-    } catch {
-      setState('error');
-    }
+    const result = await watchRefreshJob({
+      statusUrl: '/api/deliveries/status',
+      triggerUrl: '/api/deliveries/refresh',
+    });
+    setState(result);
+    if (result === 'done') setTimeout(() => window.location.reload(), 800);
   }, [state]);
 
   const label  = { idle: 'Refresh', loading: 'Scanning Gmail…', done: 'Done', error: 'Failed' }[state];
-  const colors = {
-    idle:    'border-border text-muted-foreground hover:text-foreground hover:bg-accent/30',
-    loading: 'border-border text-muted-foreground cursor-wait',
-    done:    'border-emerald-500/30 text-emerald-500 bg-emerald-500/10',
-    error:   'border-destructive/30 text-destructive bg-destructive/10',
-  }[state];
+  const colors = JOB_STATE_COLORS[state];
 
   const deliveries = data?.deliveries ?? [];
   const dismissed = data?.dismissed ?? [];

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
-import { checkoutItems, loadCarts, saveCarts } from '@/lib/grocery';
-import type { Retailer } from '@/lib/grocery-types';
+import { requireSession } from '@/lib/auth';
+import { checkoutItems, loadCarts, saveCarts } from '@/features/grocery/ops';
+import type { Retailer } from '@/features/grocery/types';
 
 /**
  * POST /api/grocery/checkout
@@ -11,8 +11,8 @@ import type { Retailer } from '@/lib/grocery-types';
  * - { itemIds: string[] } — in-store "Clear checked": same, source 'in-store'.
  */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let retailer: Retailer | undefined;
   let itemIds: string[] | undefined;

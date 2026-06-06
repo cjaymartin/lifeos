@@ -10,7 +10,11 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "populate-daily": "node --experimental-strip-types scripts/populate-daily.ts"
+    "populate-daily": "node --experimental-strip-types scripts/populate-daily.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "astro build && playwright test",
+    "test:e2e:only": "playwright test"
   },
   "dependencies": {
     "@astrojs/node": "^10.1.3",
@@ -37,5 +41,11 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.8"
+  }
 }

@@ -1,21 +1,14 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
-import { readFile, stat } from 'fs/promises';
-import { join } from 'path';
-import { DELIVERIES_FILE } from '@/lib/deliveries';
-
-const LOCK = join(process.cwd(), 'src/content/deliveries/.refresh-lock');
-const STALE_MS = 5 * 60 * 1000;
+import { requireSession } from '@/lib/auth';
+import { stat } from 'fs/promises';
+import { DELIVERIES_FILE } from '@/features/deliveries/ops';
+import { isPopulateDeliveriesRunning } from '@/features/deliveries/jobs';
 
 export const GET: APIRoute = async ({ cookies }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
-  let running = false;
-  try {
-    const ts = Number(await readFile(LOCK, 'utf-8'));
-    running = Date.now() - ts < STALE_MS;
-  } catch {}
+  const running = await isPopulateDeliveriesRunning();
 
   let lastUpdated: number | null = null;
   try {

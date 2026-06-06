@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { ArrowUpRight } from 'lucide-react';
-import type { Task } from '@/lib/tasks/types';
+import type { Task } from '@/features/tasks/ops/types';
 import {
   byAgenda,
   formatDueLabel,

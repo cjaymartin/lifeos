@@ -1,3 +1,29 @@
 {
-  "accounts": {}
+  "accounts": {
+    "todoist": {
+      "state": "ok",
+      "checkedAt": 1780709360273,
+      "detail": "Token valid — C.Jay "
+    },
+    "walmart": {
+      "state": "failed",
+      "checkedAt": 1780709361596,
+      "detail": "Browser probe error: browserType.launchPersistentContext: Executable doesn't exist at /home/node/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+    },
+    "amazon": {
+      "state": "failed",
+      "checkedAt": 1780709363064,
+      "detail": "Browser probe error: browserType.launchPersistentContext: Executable doesn't exist at /home/node/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+    },
+    "gcal": {
+      "state": "ok",
+      "checkedAt": 1780709369380,
+      "detail": "Connector responding"
+    },
+    "gmail": {
+      "state": "ok",
+      "checkedAt": 1780709369389,
+      "detail": "Connector responding"
+    }
+  }
 }

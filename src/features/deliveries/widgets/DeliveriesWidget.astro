@@ -1,0 +1,62 @@
+---
+import WidgetCard from '@/components/widgets/WidgetCard.astro';
+import type { WidgetDef } from '@/lib/widgets';
+import type { Delivery } from '@/features/deliveries/types';
+
+interface Props {
+  w: WidgetDef;
+  deliveries: Delivery[];
+}
+const { w, deliveries } = Astro.props;
+
+// Today-focused summary
+const toISODate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const now = new Date();
+const todayISO = toISODate(now);
+const tomorrowISO = toISODate(new Date(now.getTime() + 86_400_000));
+const inFlight = deliveries.filter(d => d.status !== 'delivered');
+const arrivingToday = inFlight.filter(d => d.eta === todayISO || d.status === 'out-for-delivery');
+const arrivingTomorrow = inFlight.filter(d => d.eta === tomorrowISO && !arrivingToday.includes(d));
+const deliveredRecently = deliveries.filter(d => d.status === 'delivered');
+const headline =
+  arrivingToday.length > 0 ? `${arrivingToday.length} arriving today`
+  : inFlight.length > 0 ? `${inFlight.length} in transit`
+  : `${deliveredRecently.length} delivered`;
+---
+
+{deliveries.length > 0 && (
+  <WidgetCard
+    class="bg-card border-border flex flex-col gap-3"
+    link={String(w.config.link ?? '/deliveries')}
+    linkLabel="Open Deliveries"
+    external={false}
+  >
+    <div class="space-y-0.5">
+      <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        {w.label}
+      </span>
+      <p class={`text-base font-semibold ${arrivingToday.length > 0 ? 'text-warning' : 'text-foreground'}`}>
+        {headline}
+      </p>
+    </div>
+    {(arrivingToday.length > 0 || arrivingTomorrow.length > 0) && (
+      <ul class="space-y-1.5">
+        {[...arrivingToday, ...arrivingTomorrow].slice(0, Number(w.config.maxItems ?? 4)).map(d => (
+          <li class="flex items-center gap-2 min-w-0">
+            <span class={`text-xs font-medium shrink-0 ${arrivingToday.includes(d) ? 'text-warning' : 'text-muted-foreground'}`}>
+              {arrivingToday.includes(d) ? 'Today' : 'Tomorrow'}
+            </span>
+            <span class="text-xs text-muted-foreground truncate">
+              {d.vendor} — {d.item}
+            </span>
+          </li>
+        ))}
+      </ul>
+    )}
+    {arrivingToday.length === 0 && arrivingTomorrow.length === 0 && inFlight.length > 0 && (
+      <p class="text-xs text-muted-foreground">
+        Next: {inFlight.find(d => d.eta)?.vendor ?? inFlight[0].vendor} — {inFlight.find(d => d.eta)?.eta ?? 'ETA unknown'}
+      </p>
+    )}
+  </WidgetCard>
+)}

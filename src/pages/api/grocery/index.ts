@@ -1,25 +1,19 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import {
   loadGrocery, saveGrocery, loadStaples, loadGroceryState,
   categorizeHeuristic, makeItemId,
-} from '@/lib/grocery';
-import type { GroceryItem } from '@/lib/grocery-types';
-import { normalizeName, DEFAULT_CATEGORIES } from '@/lib/grocery-types';
-import { spawnGroceryJob } from '@/lib/grocery-runner';
-
-function unauthorized(cookies: import('astro').AstroCookies): Response | null {
-  return verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? '')
-    ? null
-    : new Response('Unauthorized', { status: 401 });
-}
+} from '@/features/grocery/ops';
+import type { GroceryItem } from '@/features/grocery/types';
+import { normalizeName, DEFAULT_CATEGORIES } from '@/features/grocery/types';
+import { spawnGroceryJob } from '@/features/grocery/jobs';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
 /** GET /api/grocery — full state (applies any pending micro-agent output) */
 export const GET: APIRoute = async ({ cookies }) => {
-  const denied = unauthorized(cookies);
+  const denied = requireSession(cookies);
   if (denied) return denied;
   return json(await loadGroceryState());
 };
@@ -36,7 +30,7 @@ function parseQuickAdd(raw: string): { name: string; quantity?: string } {
 
 /** POST /api/grocery — add one or more items: { names: string[] } or { name } */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  const denied = unauthorized(cookies);
+  const denied = requireSession(cookies);
   if (denied) return denied;
 
   let names: string[];

@@ -1,0 +1,53 @@
+---
+import WidgetCard from '@/components/widgets/WidgetCard.astro';
+import type { WidgetDef, DailyData } from '@/lib/widgets';
+
+interface Props {
+  w: WidgetDef;
+  daily: DailyData | null;
+  isTrashDay: boolean;
+}
+const { w, daily, isTrashDay } = Astro.props;
+const trash = daily?.trash;
+---
+
+{trash && (
+  <WidgetCard
+    class={`flex flex-col justify-between gap-3 ${
+      isTrashDay ? 'bg-warning-subtle border-warning-border' : 'bg-card border-border'
+    }`}
+    link={w.config.link ? String(w.config.link) : undefined}
+    linkLabel={`Open ${w.label}`}
+  >
+    <div class="space-y-0.5">
+      <span class={`text-xs font-semibold uppercase tracking-wider ${
+        isTrashDay ? 'text-warning' : 'text-muted-foreground'
+      }`}>
+        {isTrashDay ? 'Today' : 'Coming up'}
+      </span>
+      <p class={`text-base font-semibold ${isTrashDay ? 'text-warning' : 'text-foreground'}`}>
+        {isTrashDay ? 'Trash Day' : `Trash — ${String(w.config.trashDay ?? 'Wednesday')}`}
+      </p>
+    </div>
+    <div class="space-y-1">
+      <div class="flex items-center gap-2">
+        <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+          isTrashDay ? 'bg-warning-subtle text-warning' : 'bg-muted text-muted-foreground'
+        }`}>Trash</span>
+        {trash.recycling && (
+          <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            isTrashDay ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground'
+          }`}>+ Recycling</span>
+        )}
+      </div>
+      {trash.note && (
+        <p class="text-xs text-warning/70">{trash.note}</p>
+      )}
+      {isTrashDay && (
+        <p class="text-xs text-muted-foreground">
+          Put out by {String(w.config.pickupBy ?? '7 AM')}
+        </p>
+      )}
+    </div>
+  </WidgetCard>
+)}

@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { verifyTOTP } from '@/lib/totp';
-import { setSession } from '@/lib/auth';
+import { setSession, getSessionSecret } from '@/lib/auth';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const { token } = await request.json().catch(() => ({ token: '' }));
@@ -12,7 +12,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
   }
 
-  setSession(cookies, import.meta.env.SESSION_SECRET ?? '');
+  setSession(cookies, getSessionSecret());
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

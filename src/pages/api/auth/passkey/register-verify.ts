@@ -1,12 +1,11 @@
 import type { APIRoute } from 'astro';
 import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import { saveCredential, rpConfig } from '@/lib/webauthn';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? '')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-  }
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   const challenge = cookies.get('passkey_reg_challenge')?.value;
   cookies.delete('passkey_reg_challenge', { path: '/' });

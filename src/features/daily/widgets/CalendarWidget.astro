@@ -1,0 +1,35 @@
+---
+import type { WidgetDef, DailyData } from '@/lib/widgets';
+
+interface Props {
+  w: WidgetDef;
+  daily: DailyData | null;
+}
+const { w, daily } = Astro.props;
+const events = daily?.calendar ?? [];
+---
+
+{events.length > 0 && (
+  <div class="rounded-xl border border-border bg-card p-5 space-y-3">
+    <span class="text-sm font-medium text-foreground">{w.label}</span>
+    <ul class="space-y-2">
+      {events.map(event => (
+        <li class="flex items-center gap-3">
+          <span class={`text-xs font-mono tabular-nums shrink-0 ${
+            event.soon ? 'text-warning font-semibold' : 'text-muted-foreground'
+          }`}>
+            {event.time}
+          </span>
+          <span class={`text-sm ${event.soon ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+            {event.title}
+          </span>
+          {event.soon && (
+            <span class="text-xs px-1.5 py-0.5 rounded-full bg-warning-subtle text-warning font-medium">
+              soon
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}

@@ -1,41 +1,40 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro';
-import { stacks } from '@/lib/stacks';
+import { stacks } from '@/features';
 import RefreshButton from '@/components/RefreshButton';
-import TasksWidget from '@/components/tasks/TasksWidget';
-import { getSnapshot } from '@/lib/tasks/store';
-import { ensureSyncLoop, getSyncStatus } from '@/lib/tasks/sync-loop';
-import { loadDeliveries } from '@/lib/deliveries';
+import { getSnapshot } from '@/features/tasks/ops/store';
+import { ensureSyncLoop, getSyncStatus } from '@/features/tasks/ops/sync-loop';
+import { loadDeliveries } from '@/features/deliveries/ops';
+import { selectWidgets, type DailyData, type WidgetDef } from '@/lib/widgets';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
-interface WidgetDef {
-  id: string;
-  type: string;
-  label: string;
-  enabled: boolean;
-  order: number;
-  size: 'card' | 'full';
-  displayCondition?: string;
-  config: Record<string, unknown>;
-  dataKey: string;
-  populator?: string;
-}
+// Widget render adapters — adding a widget type is one component + one map
+// entry; shared card chrome (incl. the corner link icon) lives in WidgetCard.
+import TrashWidget from '@/features/daily/widgets/TrashWidget.astro';
+import WeatherWidget from '@/features/daily/widgets/WeatherWidget.astro';
+import StatWidget from '@/features/daily/widgets/StatWidget.astro';
+import NoteCardWidget from '@/features/daily/widgets/NoteCardWidget.astro';
+import CalendarWidget from '@/features/daily/widgets/CalendarWidget.astro';
+import BriefingWidget from '@/features/daily/widgets/BriefingWidget.astro';
+import NoteFullWidget from '@/features/daily/widgets/NoteFullWidget.astro';
+import DeliveriesWidget from '@/features/deliveries/widgets/DeliveriesWidget.astro';
+import TasksWidgetCard from '@/features/tasks/widgets/TasksWidgetCard.astro';
 
-interface DailyData {
-  date: string;
-  greeting: string;
-  briefing: string;
-  weather?: {
-    code: number; current: number; feelsLike: number; condition: string;
-    high: number; low: number; wind: number; precipitation: string;
-  };
-  tasks?: { dueToday: number; overdue: number; items: string[] };
-  calendar?: { title: string; time: string; soon: boolean }[];
-  trash?: { today: boolean; recycling: boolean; note: string | null };
-  items?: string[];
-  [key: string]: unknown;
-}
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const CARD_RENDERERS: Record<string, any> = {
+  trash: TrashWidget,
+  weather: WeatherWidget,
+  deliveries: DeliveriesWidget,
+  tasks: TasksWidgetCard,
+  stat: StatWidget,
+  note: NoteCardWidget,
+};
+const FULL_RENDERERS: Record<string, any> = {
+  calendar: CalendarWidget,
+  briefing: BriefingWidget,
+  note: NoteFullWidget,
+};
 
 // Load widget registry
 let registry: { widgets: WidgetDef[] } = { widgets: [] };
@@ -62,122 +61,30 @@ const dayOfWeek = daily?.date
   ? new Date(daily.date + 'T12:00:00').getDay()
   : now.getDay();
 
-// Evaluate display condition
-function shouldShow(w: WidgetDef): boolean {
-  switch (w.displayCondition) {
-    case 'mon-to-trash-day': return dayOfWeek >= 1 && dayOfWeek <= 3;
-    case 'has-events': {
-      const d = daily?.[w.dataKey];
-      return Array.isArray(d) && d.length > 0;
-    }
-    case 'has-data': return !!daily?.[w.dataKey];
-    case 'has-deliveries': return deliveries.length > 0;
-    default: return true;
-  }
-}
+const { cards: cardWidgets, fulls: fullWidgets } = selectWidgets(registry.widgets, {
+  daily,
+  deliveriesCount: deliveries.length,
+  dayOfWeek,
+});
 
-// Sort enabled widgets and split by layout
-const sortedWidgets = [...registry.widgets]
-  .filter(w => w.enabled)
-  .sort((a, b) => a.order - b.order);
-const visibleWidgets = sortedWidgets.filter(shouldShow);
-const cardWidgets = visibleWidgets.filter(w => w.size === 'card');
-const fullWidgets  = visibleWidgets.filter(w => w.size === 'full');
-
-// Trash banner — any enabled trash widget whose condition is met
-const trashWidget = visibleWidgets.find(w => w.type === 'trash');
+// Trash banner — any visible trash widget whose condition is met
+const trashWidget = [...cardWidgets, ...fullWidgets].find(w => w.type === 'trash');
 const showTrashBanner = !!trashWidget && !!daily?.trash;
 const isTrashDay = dayOfWeek === 3;
-
-// Deliveries widget — today-focused summary
-const toISODate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const todayISO = toISODate(now);
-const tomorrowISO = toISODate(new Date(now.getTime() + 86_400_000));
-const inFlight = deliveries.filter(d => d.status !== 'delivered');
-const arrivingToday = inFlight.filter(d => d.eta === todayISO || d.status === 'out-for-delivery');
-const arrivingTomorrow = inFlight.filter(d => d.eta === tomorrowISO && !arrivingToday.includes(d));
-const deliveredRecently = deliveries.filter(d => d.status === 'delivered');
-const deliveriesHeadline =
-  arrivingToday.length > 0 ? `${arrivingToday.length} arriving today`
-  : inFlight.length > 0 ? `${inFlight.length} in transit`
-  : `${deliveredRecently.length} delivered`;
 
 // Grid class based on visible card count
 const gridCols = cardWidgets.length <= 1 ? 'md:grid-cols-1'
                : cardWidgets.length === 2 ? 'md:grid-cols-2'
                : 'md:grid-cols-3';
 
-// Weather SVG (WMO code-based)
-function weatherSVG(code: number): string {
-  const sunRays = `
-    <line x1="32" y1="4"  x2="32" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-    <line x1="32" y1="50" x2="32" y2="60" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-    <line x1="4"  y1="32" x2="14" y2="32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-    <line x1="50" y1="32" x2="60" y2="32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-    <line x1="11" y1="11" x2="18" y2="18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-    <line x1="46" y1="46" x2="53" y2="53" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-    <line x1="53" y1="11" x2="46" y2="18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-    <line x1="18" y1="46" x2="11" y2="53" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`;
-
-  if (code === 0 || code === 1) {
-    return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-warning">
-      ${sunRays}
-      <circle cx="32" cy="32" r="11" fill="currentColor"/>
-    </svg>`;
-  }
-  if (code <= 3) {
-    return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
-      <g class="text-warning">
-        <line x1="14" y1="10" x2="14" y2="17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="14" y1="33" x2="14" y2="40" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="3"  y1="25" x2="10" y2="25" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="18" y1="25" x2="25" y2="25" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="6"  y1="13" x2="11" y2="18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="22" y1="32" x2="17" y2="37" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="22" y1="18" x2="17" y2="13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        <circle cx="14" cy="25" r="8" fill="currentColor"/>
-      </g>
-      <g class="text-zinc-300 dark:text-zinc-400">
-        <path d="M52 44H30c-5.523 0-10-4.477-10-10s4.477-10 10-10c.34 0 .677.017 1.01.05A12 12 0 0 1 52 32c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor"/>
-      </g>
-    </svg>`;
-  }
-  if (code <= 48) {
-    return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-zinc-400">
-      <path d="M50 22H24c-5.523 0-10-4.477-10-10 0-5.523 4.477-10 10-10 .34 0 .677.017 1.01.05A12 12 0 0 1 50 10c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor" opacity="0.6"/>
-      <line x1="10" y1="34" x2="54" y2="34" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
-      <line x1="14" y1="44" x2="50" y2="44" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
-      <line x1="18" y1="54" x2="46" y2="54" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
-    </svg>`;
-  }
-  if (code <= 67 || (code >= 80 && code <= 82)) {
-    return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-blue-400">
-      <path d="M50 30H28c-5.523 0-10-4.477-10-10s4.477-10 10-10c.34 0 .677.017 1.01.05A12 12 0 0 1 50 18c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor" opacity="0.7"/>
-      <line x1="22" y1="40" x2="18" y2="52" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-      <line x1="32" y1="40" x2="28" y2="52" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-      <line x1="42" y1="40" x2="38" y2="52" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-    </svg>`;
-  }
-  if (code <= 77) {
-    return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-sky-300">
-      <path d="M50 30H28c-5.523 0-10-4.477-10-10s4.477-10 10-10c.34 0 .677.017 1.01.05A12 12 0 0 1 50 18c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor" opacity="0.5"/>
-      <circle cx="22" cy="48" r="3" fill="currentColor"/>
-      <circle cx="32" cy="52" r="3" fill="currentColor"/>
-      <circle cx="42" cy="48" r="3" fill="currentColor"/>
-    </svg>`;
-  }
-  return `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-yellow-400">
-    <path d="M50 28H28c-5.523 0-10-4.477-10-10s4.477-10 10-10c.34 0 .677.017 1.01.05A12 12 0 0 1 50 16c3.314 0 6 2.686 6 6s-2.686 6-6 6z" fill="currentColor" opacity="0.5" class="text-zinc-400"/>
-    <polyline points="36,34 28,48 34,48 26,62" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  </svg>`;
-}
-
-const weatherIcon = daily?.weather ? weatherSVG(daily.weather.code) : null;
 const dashboardStacks = stacks.filter(s => s.dashboardWidget);
 
 // Live tasks mirror — initial data for the Tasks widget island (kept fresh via SSE)
 ensureSyncLoop();
 const tasksInitial = { ...(await getSnapshot()), sync: getSyncStatus() };
+
+// One props bag for every adapter; each takes what it needs.
+const widgetProps = { daily, deliveries, tasksInitial, isTrashDay };
 ---
 
 <AppLayout title="Dashboard">
@@ -225,254 +132,18 @@ const tasksInitial = { ...(await getSnapshot()), sync: getSyncStatus() };
       {/* ── Card row ────────────────────────────────────────────────────── */}
       {cardWidgets.length > 0 && (
         <div class={`grid grid-cols-1 gap-4 ${gridCols}`}>
-          {cardWidgets.map(w => (
-            <>
-              {/* ── trash ── */}
-              {w.type === 'trash' && daily?.trash && (
-                <div class={`relative rounded-xl border p-5 flex flex-col justify-between gap-3 ${
-                  isTrashDay ? 'bg-warning-subtle border-warning-border' : 'bg-card border-border'
-                }`}>
-                  {w.config.link && (
-                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
-                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
-                       aria-label={`Open ${w.label}`}>
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/>
-                        <line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                    </a>
-                  )}
-                  <div class="space-y-0.5">
-                    <span class={`text-xs font-semibold uppercase tracking-wider ${
-                      isTrashDay ? 'text-warning' : 'text-muted-foreground'
-                    }`}>
-                      {isTrashDay ? 'Today' : 'Coming up'}
-                    </span>
-                    <p class={`text-base font-semibold ${isTrashDay ? 'text-warning' : 'text-foreground'}`}>
-                      {isTrashDay ? 'Trash Day' : `Trash — ${String(w.config.trashDay ?? 'Wednesday')}`}
-                    </p>
-                  </div>
-                  <div class="space-y-1">
-                    <div class="flex items-center gap-2">
-                      <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        isTrashDay ? 'bg-warning-subtle text-warning' : 'bg-muted text-muted-foreground'
-                      }`}>Trash</span>
-                      {daily.trash.recycling && (
-                        <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          isTrashDay ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground'
-                        }`}>+ Recycling</span>
-                      )}
-                    </div>
-                    {daily.trash.note && (
-                      <p class="text-xs text-warning/70">{daily.trash.note}</p>
-                    )}
-                    {isTrashDay && (
-                      <p class="text-xs text-muted-foreground">
-                        Put out by {String(w.config.pickupBy ?? '7 AM')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* ── weather ── */}
-              {w.type === 'weather' && daily?.weather && weatherIcon && (
-                <div class="relative rounded-xl border border-border bg-card p-5 flex gap-4 items-start">
-                  {w.config.link && (
-                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
-                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
-                       aria-label={`Open ${w.label}`}>
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/>
-                        <line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                    </a>
-                  )}
-                  <div class="w-14 h-14 shrink-0">
-                    <Fragment set:html={weatherIcon} />
-                  </div>
-                  <div class="flex-1 space-y-1 min-w-0">
-                    <div class="flex items-baseline gap-2">
-                      <span class="text-3xl font-semibold text-foreground tabular-nums">
-                        {Math.round(daily.weather.current)}°
-                      </span>
-                      <span class="text-sm text-muted-foreground">
-                        feels {Math.round(daily.weather.feelsLike)}°
-                      </span>
-                    </div>
-                    <p class="text-sm font-medium text-foreground">{daily.weather.condition}</p>
-                    <div class="flex flex-wrap gap-x-4 gap-y-0.5 pt-1">
-                      <span class="text-xs text-muted-foreground">
-                        ↑ {daily.weather.high}° / ↓ {daily.weather.low}°
-                      </span>
-                      {daily.weather.wind > 0 && (
-                        <span class="text-xs text-muted-foreground">💨 {daily.weather.wind} mph</span>
-                      )}
-                      <span class="text-xs text-muted-foreground">{daily.weather.precipitation}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── deliveries — today-focused summary from deliveries.json ── */}
-              {w.type === 'deliveries' && deliveries.length > 0 && (
-                <div class="relative rounded-xl border border-border bg-card p-5 flex flex-col gap-3">
-                  <a href={String(w.config.link ?? '/deliveries')}
-                     class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
-                     aria-label="Open Deliveries">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                      <polyline points="15 3 21 3 21 9"/>
-                      <line x1="10" y1="14" x2="21" y2="3"/>
-                    </svg>
-                  </a>
-                  <div class="space-y-0.5">
-                    <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {w.label}
-                    </span>
-                    <p class={`text-base font-semibold ${arrivingToday.length > 0 ? 'text-warning' : 'text-foreground'}`}>
-                      {deliveriesHeadline}
-                    </p>
-                  </div>
-                  {(arrivingToday.length > 0 || arrivingTomorrow.length > 0) && (
-                    <ul class="space-y-1.5">
-                      {[...arrivingToday, ...arrivingTomorrow].slice(0, Number(w.config.maxItems ?? 4)).map(d => (
-                        <li class="flex items-center gap-2 min-w-0">
-                          <span class={`text-xs font-medium shrink-0 ${arrivingToday.includes(d) ? 'text-warning' : 'text-muted-foreground'}`}>
-                            {arrivingToday.includes(d) ? 'Today' : 'Tomorrow'}
-                          </span>
-                          <span class="text-xs text-muted-foreground truncate">
-                            {d.vendor} — {d.item}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {arrivingToday.length === 0 && arrivingTomorrow.length === 0 && inFlight.length > 0 && (
-                    <p class="text-xs text-muted-foreground">
-                      Next: {inFlight.find(d => d.eta)?.vendor ?? inFlight[0].vendor} — {inFlight.find(d => d.eta)?.eta ?? 'ETA unknown'}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* ── tasks — live mirror, near-real-time via SSE ── */}
-              {w.type === 'tasks' && (
-                <TasksWidget client:load initial={tasksInitial} maxItems={Number(w.config.maxItems ?? 5)} />
-              )}
-
-              {/* ── stat ── */}
-              {w.type === 'stat' && daily?.[w.dataKey] != null && (
-                <div class="relative rounded-xl border border-border bg-card p-5 space-y-1">
-                  {w.config.link && (
-                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
-                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
-                       aria-label={`Open ${w.label}`}>
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/>
-                        <line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                    </a>
-                  )}
-                  <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {w.label}
-                  </span>
-                  <p class="text-3xl font-semibold text-foreground tabular-nums">
-                    {String(daily[w.dataKey])}
-                  </p>
-                  {w.config.unit && (
-                    <p class="text-xs text-muted-foreground">{String(w.config.unit)}</p>
-                  )}
-                </div>
-              )}
-
-              {/* ── note (card) ── */}
-              {w.type === 'note' && w.size === 'card' && w.config.content && (
-                <div class={`relative rounded-xl border p-5 space-y-1.5 ${
-                  w.config.style === 'warning' ? 'bg-warning-subtle border-warning-border' :
-                  w.config.style === 'success'  ? 'bg-emerald-500/10 border-emerald-500/40' :
-                  'bg-card border-border'
-                }`}>
-                  {w.config.link && (
-                    <a href={String(w.config.link)} target="_blank" rel="noopener noreferrer"
-                       class="absolute top-3 right-3 p-1 rounded text-muted-foreground/25 hover:text-primary hover:bg-primary/10 transition-colors"
-                       aria-label={`Open ${w.label}`}>
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/>
-                        <line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                    </a>
-                  )}
-                  {w.label && (
-                    <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {w.label}
-                    </span>
-                  )}
-                  <p class="text-sm text-foreground">{String(w.config.content)}</p>
-                </div>
-              )}
-            </>
-          ))}
+          {cardWidgets.map(w => {
+            const Renderer = CARD_RENDERERS[w.type];
+            return Renderer ? <Renderer w={w} {...widgetProps} /> : null;
+          })}
         </div>
       )}
 
       {/* ── Full-width widgets ───────────────────────────────────────────── */}
-      {fullWidgets.map(w => (
-        <>
-          {/* ── calendar ── */}
-          {w.type === 'calendar' && daily?.calendar && daily.calendar.length > 0 && (
-            <div class="rounded-xl border border-border bg-card p-5 space-y-3">
-              <span class="text-sm font-medium text-foreground">{w.label}</span>
-              <ul class="space-y-2">
-                {daily.calendar.map(event => (
-                  <li class="flex items-center gap-3">
-                    <span class={`text-xs font-mono tabular-nums shrink-0 ${
-                      event.soon ? 'text-warning font-semibold' : 'text-muted-foreground'
-                    }`}>
-                      {event.time}
-                    </span>
-                    <span class={`text-sm ${event.soon ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                      {event.title}
-                    </span>
-                    {event.soon && (
-                      <span class="text-xs px-1.5 py-0.5 rounded-full bg-warning-subtle text-warning font-medium">
-                        soon
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* ── briefing ── */}
-          {w.type === 'briefing' && daily?.briefing && (
-            <p class="text-sm text-muted-foreground leading-relaxed border-l-2 border-border pl-4 italic">
-              {daily.briefing}
-            </p>
-          )}
-
-          {/* ── note (full) ── */}
-          {w.type === 'note' && w.size === 'full' && w.config.content && (
-            <div class={`rounded-xl border p-5 ${
-              w.config.style === 'warning' ? 'bg-warning-subtle border-warning-border' :
-              w.config.style === 'success'  ? 'bg-emerald-500/10 border-emerald-500/40' :
-              'bg-card border-border'
-            }`}>
-              {w.label && (
-                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                  {w.label}
-                </p>
-              )}
-              <p class="text-sm text-foreground">{String(w.config.content)}</p>
-            </div>
-          )}
-        </>
-      ))}
+      {fullWidgets.map(w => {
+        const Renderer = FULL_RENDERERS[w.type];
+        return Renderer ? <Renderer w={w} {...widgetProps} /> : null;
+      })}
 
       {/* ── Stacks (additive, at bottom) ────────────────────────────────── */}
       {dashboardStacks.length > 0 && (

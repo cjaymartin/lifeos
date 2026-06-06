@@ -1,12 +1,12 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
-import { getSnapshot } from '@/lib/tasks/store';
-import { ensureSyncLoop, getSyncStatus, syncNow } from '@/lib/tasks/sync-loop';
+import { requireSession } from '@/lib/auth';
+import { getSnapshot } from '@/features/tasks/ops/store';
+import { ensureSyncLoop, getSyncStatus, syncNow } from '@/features/tasks/ops/sync-loop';
 
 /** POST /api/tasks/sync — force an immediate sync pass */
 export const POST: APIRoute = async ({ cookies }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   ensureSyncLoop();
   await syncNow();

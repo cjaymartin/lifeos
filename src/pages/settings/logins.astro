@@ -1,7 +1,7 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro';
 import SettingsApp from '@/components/settings/SettingsApp';
-import { loadSettingsSnapshot } from '@/lib/settings/account-info';
+import { loadSettingsSnapshot } from '@/features/settings/ops/account-info';
 
 const initial = await loadSettingsSnapshot();
 ---

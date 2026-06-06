@@ -1,7 +1,7 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro';
 import DeliveriesApp from '@/components/deliveries/DeliveriesApp';
-import { loadDeliveries } from '@/lib/deliveries';
+import { loadDeliveries } from '@/features/deliveries/ops';
 
 const initial = await loadDeliveries();
 ---

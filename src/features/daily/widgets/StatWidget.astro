@@ -1,0 +1,29 @@
+---
+import WidgetCard from '@/components/widgets/WidgetCard.astro';
+import type { WidgetDef, DailyData } from '@/lib/widgets';
+
+interface Props {
+  w: WidgetDef;
+  daily: DailyData | null;
+}
+const { w, daily } = Astro.props;
+const value = daily?.[w.dataKey];
+---
+
+{value != null && (
+  <WidgetCard
+    class="bg-card border-border space-y-1"
+    link={w.config.link ? String(w.config.link) : undefined}
+    linkLabel={`Open ${w.label}`}
+  >
+    <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+      {w.label}
+    </span>
+    <p class="text-3xl font-semibold text-foreground tabular-nums">
+      {String(value)}
+    </p>
+    {w.config.unit && (
+      <p class="text-xs text-muted-foreground">{String(w.config.unit)}</p>
+    )}
+  </WidgetCard>
+)}

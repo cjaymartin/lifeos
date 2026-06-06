@@ -1,31 +1,13 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
-import { readdir, readFile } from 'fs/promises';
+import { requireSession } from '@/lib/auth';
 import { join } from 'path';
-import { spawn } from 'child_process';
-import { stacks, CHAT_BASE_TOOLS } from '@/lib/stacks';
+import { runAgentCapture } from '@/lib/jobs/runner';
+import { loadStackContent } from '@/lib/content-store';
+import { stacks, CHAT_BASE_TOOLS, loadChatGuide } from '@/features';
 
 export interface Proposal {
   summary: string;
   files: { path: string; description: string }[];
-}
-
-async function loadStackContent(stackId: string): Promise<string> {
-  const dir = join(process.cwd(), 'src/content', stackId);
-  try {
-    const entries = await readdir(dir);
-    const files = entries.filter(f => !f.startsWith('.') && f !== '.gitkeep' && (f.endsWith('.md') || f.endsWith('.json')));
-    if (files.length === 0) return '(no content yet)';
-    const contents = await Promise.all(
-      files.map(async f => {
-        const raw = await readFile(join(dir, f), 'utf-8');
-        return `### ${f}\n${raw}`;
-      })
-    );
-    return contents.join('\n\n---\n\n');
-  } catch {
-    return '(no content yet)';
-  }
 }
 
 function parseProposal(text: string): { cleanText: string; proposal?: Proposal } {
@@ -52,30 +34,9 @@ function parseProposal(text: string): { cleanText: string; proposal?: Proposal }
   }
 }
 
-function runClaude(prompt: string, tools: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: string[] = [];
-    const proc = spawn(
-      'claude',
-      ['-p', prompt, '--allowedTools', tools.join(','), '--output-format', 'text'],
-      // detached → own process group: claude's exit-time cleanup signals can
-      // never reach the server (an attached claude SIGTERM'd the whole app)
-      { cwd: process.cwd(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env }, detached: true }
-    );
-    proc.stdout.on('data', (d: Buffer) => chunks.push(d.toString()));
-    const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout after 5 minutes')); }, 300_000);
-    proc.on('close', code => {
-      clearTimeout(timer);
-      if (code === 0 || chunks.length > 0) resolve(chunks.join('').trim());
-      else reject(new Error(`claude exited with code ${code}`));
-    });
-    proc.on('error', err => { clearTimeout(timer); reject(err); });
-  });
-}
-
 export const POST: APIRoute = async ({ request, cookies }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let body: {
     message?: string; stackId?: string; stackLabel?: string;
@@ -97,7 +58,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // Phase 1: no writes — Claude proposes first. Phase 2: all tools after user approval.
   const tools = approved ? allTools : allTools.filter(t => t !== 'Write' && t !== 'Edit');
 
-  const stackContent = await loadStackContent(stackId);
+  const [stackContent, chatGuide] = await Promise.all([
+    loadStackContent(stackId),
+    loadChatGuide(stackId), // the feature's chat.md — schemas, hard rules
+  ]);
   const contentDir = join(process.cwd(), 'src/content', stackId);
 
   const historyText = history.slice(0, -1)
@@ -126,7 +90,7 @@ ${approved ? `- Write files in: ${contentDir}` : '- File writes require user app
 - Keep responses concise and friendly.
 
 ${writeGuidance}
-${stack?.chatGuidance ? `\nStack-specific guidance:\n${stack.chatGuidance}\n` : ''}
+${chatGuide ? `\nStack-specific guidance:\n${chatGuide}\n` : ''}
 Current ${stackLabel} content:
 ${stackContent}`;
 
@@ -137,7 +101,7 @@ ${historyText ? `Conversation so far:\n${historyText}\n\n` : ''}User: ${message}
 Today's date: ${new Date().toISOString().slice(0, 10)}`;
 
   try {
-    const raw = await runClaude(fullPrompt, tools);
+    const raw = await runAgentCapture({ prompt: fullPrompt, allowedTools: tools });
 
     if (!approved) {
       const { cleanText, proposal } = parseProposal(raw);
