@@ -1,13 +1,10 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { loadCarts, saveCarts, rebuildCartUrl } from '@/lib/grocery';
 import type { Retailer } from '@/lib/grocery-types';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-
-const auth = (cookies: import('astro').AstroCookies) =>
-  verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? '');
 
 /** POST /api/grocery/carts — { retailer, action? }:
  *  - action 'mark-added' (default): record that the user pushed the pending
@@ -17,7 +14,8 @@ const auth = (cookies: import('astro').AstroCookies) =>
  *    go through — bot check, login wall, emptied cart) so the button offers
  *    the full add again. */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!auth(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let retailer: Retailer, action: string;
   try {
@@ -45,7 +43,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 /** PATCH /api/grocery/carts — { retailer, itemId }: remove one matched item
  *  from a built cart and rebuild its add-to-cart link. */
 export const PATCH: APIRoute = async ({ cookies, request }) => {
-  if (!auth(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let retailer: Retailer, itemId: string;
   try {
@@ -72,7 +71,8 @@ export const PATCH: APIRoute = async ({ cookies, request }) => {
 /** DELETE /api/grocery/carts — { retailer? }: dismiss one built cart, or all
  *  built carts when retailer is omitted. Does NOT touch the grocery list. */
 export const DELETE: APIRoute = async ({ cookies, request }) => {
-  if (!auth(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let retailer: Retailer | undefined;
   try { ({ retailer } = await request.json() as { retailer?: Retailer }); } catch {}

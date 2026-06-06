@@ -1,5 +1,5 @@
 import { defineMiddleware } from 'astro:middleware';
-import { verifySession } from '@/lib/auth';
+import { hasSession } from '@/lib/auth';
 import { ensureSyncLoop } from '@/lib/tasks/sync-loop';
 
 const PUBLIC = [
@@ -18,10 +18,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
   if (PUBLIC.some((p) => pathname.startsWith(p))) return next();
 
-  const secret = import.meta.env.SESSION_SECRET ?? '';
-  const cookie = context.cookies.get('lifeos_session')?.value;
-
-  if (!verifySession(cookie, secret)) {
+  if (!hasSession(context.cookies)) {
     return context.redirect('/login');
   }
 

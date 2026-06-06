@@ -1,21 +1,6 @@
 {
-  "lastSynced": "2026-06-05T08:25:10-04:00",
+  "lastSynced": "2026-06-06T05:01:51-04:00",
   "deliveries": [
-    {
-      "id": "amazon-pharmacy-bupropion-20260604",
-      "vendor": "Amazon Pharmacy",
-      "item": "Bupropion (24HR) 150 MG — 30-day supply",
-      "category": "pharmacy",
-      "carrier": null,
-      "trackingNumber": null,
-      "trackingUrl": "https://pharmacy.amazon.com/dashboard/orders",
-      "status": "shipped",
-      "eta": "2026-06-05",
-      "etaWindow": null,
-      "deliveredAt": null,
-      "emailThreadId": "19e94b92cb32e9d7",
-      "emailUrl": "https://mail.google.com/mail/u/0/#all/19e94b92cb32e9d7"
-    },
     {
       "id": "113-3400877-0153026",
       "vendor": "Amazon",
@@ -47,21 +32,6 @@
       "emailUrl": "https://mail.google.com/mail/u/0/#all/19e978b13923e80d"
     },
     {
-      "id": "300981",
-      "vendor": "Moment",
-      "item": "Mocktail variety (24-pack) + mood-boosting soda variety (24-pack)",
-      "category": "food",
-      "carrier": "USPS",
-      "trackingNumber": "9234690379178201960893",
-      "trackingUrl": "https://tools.usps.com/go/TrackConfirmAction?tLabels=9234690379178201960893",
-      "status": "delivered",
-      "eta": "2026-06-03",
-      "etaWindow": null,
-      "deliveredAt": "2026-06-03",
-      "emailThreadId": "19e8eacc1404e09b",
-      "emailUrl": "https://mail.google.com/mail/u/0/#all/19e8eacc1404e09b"
-    },
-    {
       "id": "1ZHG67191325822085",
       "vendor": "Ezra",
       "item": "Semaglutide+B12 Rapid Titration (Monthly) — Order #4958",
@@ -90,6 +60,36 @@
       "deliveredAt": "2026-06-04",
       "emailThreadId": "19e9083218e11de1",
       "emailUrl": "https://mail.google.com/mail/u/0/#all/19e9083218e11de1"
+    },
+    {
+      "id": "amazon-pharmacy-bupropion-20260604",
+      "vendor": "Amazon Pharmacy",
+      "item": "Bupropion (24HR) 150 MG — 30-day supply",
+      "category": "pharmacy",
+      "carrier": null,
+      "trackingNumber": null,
+      "trackingUrl": "https://pharmacy.amazon.com/dashboard/orders",
+      "status": "delivered",
+      "eta": "2026-06-05",
+      "etaWindow": null,
+      "deliveredAt": "2026-06-05",
+      "emailThreadId": "19e98d477e917ad7",
+      "emailUrl": "https://mail.google.com/mail/u/0/#all/19e98d477e917ad7"
+    },
+    {
+      "id": "1ZY613500325900656",
+      "vendor": "Woot",
+      "item": "Samsung Galaxy Buds 4 Pro (2026) — Order #211646638",
+      "category": "package",
+      "carrier": "UPS",
+      "trackingNumber": "1ZY613500325900656",
+      "trackingUrl": "https://www.ups.com/track?tracknum=1ZY613500325900656",
+      "status": "delivered",
+      "eta": "2026-06-05",
+      "etaWindow": null,
+      "deliveredAt": "2026-06-05",
+      "emailThreadId": "19e995bb9b204df5",
+      "emailUrl": "https://mail.google.com/mail/u/0/#all/19e995bb9b204df5"
     }
   ]
 }

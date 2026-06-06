@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { getSnapshot, taskEvents } from '@/lib/tasks/store';
 import { ensureSyncLoop } from '@/lib/tasks/sync-loop';
 
@@ -11,8 +11,8 @@ const HEARTBEAT_MS = 25_000;
  * clients refetch /api/tasks on each one. EventSource auto-reconnects.
  */
 export const GET: APIRoute = async ({ cookies }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   ensureSyncLoop();
   const encoder = new TextEncoder();

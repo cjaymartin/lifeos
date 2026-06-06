@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { getAccount } from '@/lib/settings/accounts';
 import { importCookies } from '@/lib/settings/browser-session';
 import { setAccountStatus } from '@/lib/settings/status';
@@ -11,8 +11,8 @@ import type { AccountId } from '@/lib/settings/settings-types';
  * whole round trip is ~15-30s and the UI awaits the verdict.
  */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   const { accountId, cookies: cookieJson } = (await request.json().catch(() => ({}))) as {
     accountId?: AccountId;

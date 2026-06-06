@@ -1,12 +1,11 @@
 import type { APIRoute } from 'astro';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 import { loadCredentials, rpConfig } from '@/lib/webauthn';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 
 export const GET: APIRoute = async ({ cookies }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? '')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-  }
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   const { rpID } = rpConfig();
   const existing = await loadCredentials();

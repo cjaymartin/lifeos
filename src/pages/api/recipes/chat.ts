@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { spawn } from 'child_process';
@@ -56,8 +56,8 @@ function runClaude(prompt: string): Promise<string> {
 }
 
 export const POST: APIRoute = async ({ request, cookies }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let body: { message?: string; slug?: string; history?: { role: string; content: string }[] };
   try { body = await request.json(); } catch {

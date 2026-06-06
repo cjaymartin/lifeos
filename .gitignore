@@ -45,3 +45,9 @@ src/content/settings/.probe-*
 
 # claude code session worktrees
 .claude/worktrees/
+
+# test infrastructure (sandboxed content copies, playwright artifacts)
+.test-sandbox/
+test-results/
+playwright-report/
+tests/e2e/.auth/

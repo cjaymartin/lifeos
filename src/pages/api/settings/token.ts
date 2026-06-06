@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { getAccount } from '@/lib/settings/accounts';
 import { setAccountSecrets } from '@/lib/settings/secrets';
 import { setAccountStatus } from '@/lib/settings/status';
@@ -8,8 +8,8 @@ import type { AccountId } from '@/lib/settings/settings-types';
 
 /** Verify-then-save an API token. Rejects tokens that fail live verification. */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   const { accountId, token } = (await request.json().catch(() => ({}))) as {
     accountId?: AccountId;

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import { loadCredentials, toWebAuthnCredential, updateCounter, rpConfig } from '@/lib/webauthn';
-import { setSession } from '@/lib/auth';
+import { setSession, getSessionSecret } from '@/lib/auth';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const challenge = cookies.get('passkey_challenge')?.value;
@@ -36,7 +36,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     await updateCounter(stored.id, authenticationInfo.newCounter);
-    setSession(cookies, import.meta.env.SESSION_SECRET ?? '');
+    setSession(cookies, getSessionSecret());
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { 'Content-Type': 'application/json' },

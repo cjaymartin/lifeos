@@ -1,9 +1,7 @@
 ---
-import { verifySession } from '@/lib/auth';
+import { hasSession } from '@/lib/auth';
 
-const secret = import.meta.env.SESSION_SECRET ?? '';
-const cookie = Astro.cookies.get('lifeos_session')?.value;
-if (verifySession(cookie, secret)) return Astro.redirect('/');
+if (hasSession(Astro.cookies)) return Astro.redirect('/');
 
 const error = Astro.url.searchParams.get('error');
 ---

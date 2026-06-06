@@ -49,3 +49,17 @@ docker compose -p lifeos up -d
 ```
 
 Or after rebuilding, go to Portainer → Stacks → lifeos → Recreate. (A pinned, non-watching production image is still available via `docker build --target runtime`.)
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues (`abraxas/lifeos`) via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary — each triage role's label equals its canonical name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

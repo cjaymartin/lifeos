@@ -1,17 +1,15 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { getSnapshot } from '@/lib/tasks/store';
 import { ensureSyncLoop, getProvider, getSyncStatus, syncNow } from '@/lib/tasks/sync-loop';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
-const authorized = (cookies: any) =>
-  verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? '');
-
 /** GET /api/tasks — the full mirror + sync status */
 export const GET: APIRoute = async ({ cookies }) => {
-  if (!authorized(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
   ensureSyncLoop();
   const snapshot = await getSnapshot();
   return json({ ...snapshot, sync: getSyncStatus() });
@@ -19,7 +17,8 @@ export const GET: APIRoute = async ({ cookies }) => {
 
 /** POST /api/tasks — create a task. Body: TaskDraft, or { quickAdd: "text" } */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!authorized(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   const provider = getProvider();
   if (!provider) return json({ error: 'No task provider configured — set TODOIST_API_TOKEN' }, 503);

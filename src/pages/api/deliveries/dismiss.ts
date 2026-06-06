@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { readFile, writeFile } from 'fs/promises';
 import { DISMISSED_FILE } from '@/lib/deliveries';
 
@@ -8,8 +8,8 @@ const KEEP_MS = 45 * 24 * 60 * 60 * 1000; // prune dismissals older than 45 days
 interface Dismissal { id: string; dismissedAt: string }
 
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let id: string;
   try {

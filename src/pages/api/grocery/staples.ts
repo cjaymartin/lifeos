@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import {
   loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, syncStapleToList, renameInProductMap,
 } from '@/lib/grocery';
@@ -9,12 +9,10 @@ import type { RestockAt, Retailer, StapleStatus } from '@/lib/grocery-types';
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
-const auth = (cookies: import('astro').AstroCookies) =>
-  verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? '');
-
 /** POST /api/grocery/staples — add a staple directly: { name, category? } */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!auth(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let name: string, category: string | undefined;
   try {
@@ -51,7 +49,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
  *  buyFrom also propagate to any matching unchecked list item (and renames
  *  carry the product-map pin along). */
 export const PATCH: APIRoute = async ({ cookies, request }) => {
-  if (!auth(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let body: { id: string; status?: StapleStatus; category?: string; name?: string; buyFrom?: Retailer | null; restockAt?: RestockAt };
   try {
@@ -107,7 +106,8 @@ export const PATCH: APIRoute = async ({ cookies, request }) => {
 
 /** DELETE /api/grocery/staples — { id } */
 export const DELETE: APIRoute = async ({ cookies, request }) => {
-  if (!auth(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let id: string;
   try { ({ id } = await request.json() as { id: string }); if (!id) throw new Error(); } catch {

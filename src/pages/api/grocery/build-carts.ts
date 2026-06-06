@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { writeFile, unlink } from 'fs/promises';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import {
   CART_REQUEST_FILE, loadGrocery, loadCarts, saveCarts, loadProductMap, rebuildCartUrl,
 } from '@/lib/grocery';
@@ -24,8 +24,8 @@ function countQty(quantity?: string): number {
  * - Only unknown items are handed to the /build-carts agent.
  */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let itemIds: string[] | undefined;
   try {

@@ -1,24 +1,28 @@
 {
-  "date": "2026-06-05",
+  "date": "2026-06-06",
   "greeting": "Good morning, C.Jay.",
-  "briefing": "Good morning! It's a mild 69° in Mattapoisett right now under clear skies, warming to a summery high of 82° with no rain in sight — a great day to be outside. You've got 3 small tasks due today and nothing overdue, so it's a light list. Your calendar is clear of meetings. Keep an eye out for your Amazon Pharmacy Bupropion refill, which should land today.",
+  "briefing": "Good morning! It's a cool, clear 59° start in Mattapoisett, warming to a gorgeous 80° this afternoon with no rain in the forecast — a proper June Saturday. You've got 7 recurring tasks on the docket; don't skip your Fiber and GLP-1, and the weekend chores (vacuuming upstairs, bathrooms) are waiting. Nothing's landing today, but two Amazon orders — your Huel and the Owen Mumford injection aid — are due tomorrow. Enjoy it out there.",
   "weather": {
     "code": 0,
-    "current": 69,
-    "feelsLike": 70,
+    "current": 59,
+    "feelsLike": 56,
     "condition": "Clear",
-    "high": 82,
-    "low": 51,
-    "wind": 2,
+    "high": 80,
+    "low": 58,
+    "wind": 5,
     "precipitation": "None expected"
   },
   "tasks": {
-    "dueToday": 3,
+    "dueToday": 7,
     "overdue": 0,
     "items": [
       "Take Fiber",
+      "Take GLP-1",
+      "Do Something",
       "Brush Teeth Morning",
-      "Do Something (toward improving house/life)"
+      "Brush Teeth Evening",
+      "Vacuum Upstairs",
+      "Clean Bathrooms"
     ]
   },
   "calendar": [],
@@ -28,9 +32,10 @@
     "note": null
   },
   "items": [
-    "Take Fiber (p1)",
-    "Brush teeth — morning",
-    "Do Something toward improving house/life",
-    "Amazon Pharmacy Bupropion refill arrives today"
+    "Take your daily Fiber and GLP-1",
+    "Vacuum upstairs",
+    "Clean the bathrooms",
+    "Brush teeth — morning and 7 PM",
+    "Do something toward improving house/life"
   ]
 }

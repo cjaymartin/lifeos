@@ -1,19 +1,17 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { loadProductMap, saveProductMap, parseProductUrl } from '@/lib/grocery';
 import { normalizeName } from '@/lib/grocery-types';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
-const auth = (cookies: import('astro').AstroCookies) =>
-  verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? '');
-
 /** POST /api/grocery/product-map — { name, url }: pin an exact retailer
  *  product to an item/staple name. build-carts treats pinned entries as
  *  authoritative. */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!auth(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let name: string, url: string;
   try {
@@ -39,7 +37,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
 /** DELETE /api/grocery/product-map — { name }: remove a pinned/learned product */
 export const DELETE: APIRoute = async ({ cookies, request }) => {
-  if (!auth(cookies)) return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let name: string;
   try {

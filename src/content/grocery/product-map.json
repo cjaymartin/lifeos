@@ -6,12 +6,6 @@
     "productUrl": "https://www.walmart.com/ip/43984343",
     "pinned": true
   },
-  "cream cheese": {
-    "retailer": "walmart",
-    "productId": "126245732",
-    "product": "Great Value Original Cream Cheese Spread, 16 oz Tub",
-    "productUrl": "https://www.walmart.com/ip/Great-Value-Original-Cream-Cheese-Spread-16-oz-Tub/126245732"
-  },
   "paper plates": {
     "retailer": "walmart",
     "productId": "410940806",
@@ -84,5 +78,11 @@
     "product": "Shamrock Farms Rockin' Protein Max Vanilla, 19.7 fl oz",
     "productUrl": "https://www.walmart.com/ip/Shamrock-Rockin-Protein-Max-Vanilla-19-7-FL-OZ/15401474380",
     "pinned": true
+  },
+  "cream cheese spread": {
+    "retailer": "walmart",
+    "productId": "126245732",
+    "product": "Great Value Original Cream Cheese Spread, 16 oz Tub",
+    "productUrl": "https://www.walmart.com/ip/Great-Value-Original-Cream-Cheese-Spread-16-oz-Tub/126245732"
   }
 }

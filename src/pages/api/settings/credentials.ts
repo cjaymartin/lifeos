@@ -1,13 +1,13 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { getAccount } from '@/lib/settings/accounts';
 import { setAccountSecrets } from '@/lib/settings/secrets';
 import type { AccountId } from '@/lib/settings/settings-types';
 
 /** Save (or clear) retailer credentials for tier-1 auto re-login. */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   const { accountId, username, password } = (await request.json().catch(() => ({}))) as {
     accountId?: AccountId;
@@ -35,8 +35,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 };
 
 export const DELETE: APIRoute = async ({ cookies, request }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   const { accountId } = (await request.json().catch(() => ({}))) as { accountId?: AccountId };
   const account = accountId && getAccount(accountId);

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { verifySession } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import {
   loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, renameInProductMap,
 } from '@/lib/grocery';
@@ -13,8 +13,8 @@ const json = (data: unknown, status = 200) =>
  *  Renames carry the product-map pin and any matching staple along; buyFrom
  *  syncs to the staple too so the preference survives checkouts. */
 export const PATCH: APIRoute = async ({ cookies, request, params }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   let body: {
     checked?: boolean; name?: string; quantity?: string; note?: string;
@@ -77,8 +77,8 @@ export const PATCH: APIRoute = async ({ cookies, request, params }) => {
 
 /** DELETE /api/grocery/items/:id */
 export const DELETE: APIRoute = async ({ cookies, params }) => {
-  if (!verifySession(cookies.get('lifeos_session')?.value, import.meta.env.SESSION_SECRET ?? ''))
-    return new Response('Unauthorized', { status: 401 });
+  const denied = requireSession(cookies);
+  if (denied) return denied;
 
   const grocery = await loadGrocery();
   const before = grocery.items.length;
