@@ -75,6 +75,18 @@ RUN npm ci --omit=dev \
   # the volume mountpoints aren't root-owned (EACCES on first build otherwise)
   && mkdir -p dist .astro
 
+# Bundled Chromium fallback for launchProfile() (browser-session.ts): it prefers
+# real Chrome (channel:'chrome', apt-installed above) but falls back to
+# Playwright's own Chromium when that launch fails. Without the browser present
+# the fallback throws "Executable doesn't exist" and every Settings → Logins
+# verify/relogin/cart job dies on the live instance (NIM-1). Run as the node
+# user so it lands in the $HOME/.cache/ms-playwright the server (uid 1000,
+# HOME=/home/node) reads at runtime; Chrome's apt deps above already cover
+# Chromium's shared libs, so --with-deps would be redundant. Invoke the runtime
+# `playwright` package's CLI directly — `npx playwright`/.bin/playwright resolves
+# to the @playwright/test dev dep, which `npm ci --omit=dev` above doesn't install.
+RUN node node_modules/playwright/cli.js install chromium
+
 EXPOSE 4321
 
 CMD ["npx", "nodemon"]
