@@ -62,6 +62,11 @@ Last pass: 2026-06-06 · Status: pass
 Expected: zero.
 Last pass: 2026-06-06 · Status: pass
 
+### GROC-13 — island SSR crash terminates with a 500, never hangs
+Steps: load `/dev/ssr-crash?boom=1` (a fixture island that throws during SSR), then `/dev/ssr-crash` with no flag.
+Expected: the throwing load returns HTTP 500 + the custom 500 page ("couldn't render") within the timeout — a terminated response, not the historical infinite hang (issue NIM-5); the un-flagged load renders the island fine. Relies on `experimentalDisableStreaming` (astro.config.mjs) buffering the render so the throw surfaces before headers. Runs after GROC-12 because the 500 logs a browser console error.
+Last pass: 2026-06-06 · Status: pass
+
 ### GROC-M1 — real cart build end-to-end (live agent)
 Steps: manual, on the live instance — build carts with unknown items.
 Expected: /build-carts agent matches products; progress streams in the UI.
