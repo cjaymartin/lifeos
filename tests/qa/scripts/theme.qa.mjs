@@ -15,8 +15,9 @@ await qa.check('THEME-1', 'theme toggle switches and persists across pages', asy
 });
 
 await qa.check('THEME-2', 'light mode: no hydration/page errors across pages', async (page) => {
-  // Known-fail 2026-06-06: Sidebar seeds useState from localStorage, so SSR
-  // (dark) mismatches the client (light) → React #418 on every page.
+  // Fixed NIM-9 / #4: Sidebar seeds useState('dark') to match SSR and adopts
+  // the stored theme in a post-mount effect, so first client render agrees with
+  // the SSR markup → no React #418. Unit-covered in sidebar-theme-hydration.test.tsx.
   const before = qa.consoleErrors.length;
   for (const p of ['/tasks', '/grocery', '/deliveries', '/recipes']) {
     await page.goto(BASE + p);
