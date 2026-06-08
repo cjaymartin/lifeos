@@ -3,9 +3,7 @@ import { requireSession } from '@/lib/auth';
 import type { DueSpec, TaskPatch } from '@/features/tasks/ops/provider';
 import { getSnapshot } from '@/features/tasks/ops/store';
 import { getProvider, syncNow } from '@/features/tasks/ops/sync-loop';
-
-const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+import { json, taskInMirror, upstreamErrorStatus } from '@/features/tasks/ops/route-helpers';
 
 /**
  * PATCH /api/tasks/:id — update fields and/or move.
@@ -24,6 +22,7 @@ export const PATCH: APIRoute = async ({ cookies, params, request }) => {
   const id = params.id!;
   const body = await request.json().catch(() => null);
   if (!body) return json({ error: 'Invalid JSON body' }, 400);
+  if (!(await taskInMirror(id))) return json({ error: 'Task not found' }, 404);
 
   try {
     const patch: TaskPatch = {};
@@ -62,7 +61,7 @@ export const PATCH: APIRoute = async ({ cookies, params, request }) => {
     await syncNow();
     return json({ ok: true });
   } catch (err) {
-    return json({ error: err instanceof Error ? err.message : 'update failed' }, 502);
+    return json({ error: err instanceof Error ? err.message : 'update failed' }, upstreamErrorStatus(err));
   }
 };
 
@@ -73,11 +72,14 @@ export const DELETE: APIRoute = async ({ cookies, params }) => {
   const provider = getProvider();
   if (!provider) return json({ error: 'No task provider configured — set TODOIST_API_TOKEN' }, 503);
 
+  const id = params.id!;
+  if (!(await taskInMirror(id))) return json({ error: 'Task not found' }, 404);
+
   try {
-    await provider.deleteTask(params.id!);
+    await provider.deleteTask(id);
     await syncNow();
     return json({ ok: true });
   } catch (err) {
-    return json({ error: err instanceof Error ? err.message : 'delete failed' }, 502);
+    return json({ error: err instanceof Error ? err.message : 'delete failed' }, upstreamErrorStatus(err));
   }
 };
