@@ -14,8 +14,9 @@ test.describe('deliveries stack', () => {
   });
 
   test('dismiss and restore a delivery round-trips', async ({ page }) => {
-    // The server's write isn't atomic, so a poll can catch the file mid-write —
-    // treat an unparseable read as "not yet" rather than failing the poll.
+    // The server's write is now atomic (temp + rename, NIM-6 / #7), so a poll
+    // can no longer catch the file mid-write. We keep treating an unparseable
+    // read as "not yet" as belt-and-suspenders against any future regression.
     const dismissedJson = () => {
       try {
         return readSandboxJson<{ dismissed: { id: string }[] }>(

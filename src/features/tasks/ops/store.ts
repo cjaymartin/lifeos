@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
-import { mkdir, readFile, rename, writeFile } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { writeJson } from '@/lib/content-store';
 import type { SyncResult } from './provider';
 import type { CompletedTask, TasksSnapshot } from './types';
 import { emptySnapshot } from './types';
@@ -25,13 +26,6 @@ state.emitter.setMaxListeners(50); // many SSE clients
 
 /** Subscribe to 'change' events: (version: number) => void */
 export const taskEvents: EventEmitter = state.emitter;
-
-async function writeAtomic(file: string, data: unknown): Promise<void> {
-  await mkdir(DIR, { recursive: true });
-  const tmp = `${file}.tmp`;
-  await writeFile(tmp, JSON.stringify(data, null, 2));
-  await rename(tmp, file);
-}
 
 export async function getSnapshot(): Promise<TasksSnapshot> {
   if (state.snapshot) return state.snapshot;
@@ -85,7 +79,7 @@ export async function applySync(provider: string, result: SyncResult): Promise<T
   next.version = prev.version + 1;
 
   state.snapshot = next;
-  await writeAtomic(SNAPSHOT_FILE, next);
+  await writeJson(SNAPSHOT_FILE, next);
 
   // Completions observed in the delta feed the history log incrementally;
   // reactivated (uncompleted) and hard-deleted tasks must drop back out of it.
@@ -95,7 +89,7 @@ export async function applySync(provider: string, result: SyncResult): Promise<T
     const completed = await getCompleted();
     if (completed.some((c) => dropFromLog.has(c.id))) {
       state.completed = completed.filter((c) => !dropFromLog.has(c.id));
-      await writeAtomic(COMPLETED_FILE, state.completed);
+      await writeJson(COMPLETED_FILE, state.completed);
     }
   }
 
@@ -111,7 +105,7 @@ export async function mergeCompleted(items: CompletedTask[], emit = true): Promi
   state.completed = [...byId.values()]
     .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
     .slice(0, COMPLETED_CAP);
-  await writeAtomic(COMPLETED_FILE, state.completed);
+  await writeJson(COMPLETED_FILE, state.completed);
   if (emit) {
     const snap = await getSnapshot();
     state.emitter.emit('change', snap.version);

@@ -1,5 +1,6 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { writeJson } from '@/lib/content-store';
 import type { AuthenticatorTransportFuture } from '@simplewebauthn/server';
 
 const DATA_DIR = join(process.cwd(), 'data');
@@ -28,8 +29,7 @@ export async function saveCredential(cred: StoredCredential): Promise<void> {
   const idx = creds.findIndex((c) => c.id === cred.id);
   if (idx >= 0) creds[idx] = cred;
   else creds.push(cred);
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(CRED_PATH, JSON.stringify(creds, null, 2), 'utf-8');
+  await writeJson(CRED_PATH, creds);
 }
 
 export async function updateCounter(id: string, counter: number): Promise<void> {
@@ -37,13 +37,13 @@ export async function updateCounter(id: string, counter: number): Promise<void> 
   const cred = creds.find((c) => c.id === id);
   if (cred) {
     cred.counter = counter;
-    await writeFile(CRED_PATH, JSON.stringify(creds, null, 2), 'utf-8');
+    await writeJson(CRED_PATH, creds);
   }
 }
 
 export async function deleteCredential(id: string): Promise<void> {
   const creds = (await loadCredentials()).filter((c) => c.id !== id);
-  await writeFile(CRED_PATH, JSON.stringify(creds, null, 2), 'utf-8');
+  await writeJson(CRED_PATH, creds);
 }
 
 export function toWebAuthnCredential(cred: StoredCredential) {

@@ -1,9 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { readFile, writeFile } from 'fs/promises';
-import { DISMISSED_FILE } from '@/features/deliveries/ops';
-
-interface Dismissal { id: string; dismissedAt: string }
+import { readFile } from 'fs/promises';
+import { DISMISSED_FILE, saveDismissed, type Dismissal } from '@/features/deliveries/ops';
 
 export const POST: APIRoute = async ({ cookies, request }) => {
   const denied = requireSession(cookies);
@@ -24,7 +22,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   dismissed = dismissed.filter(d => d.id !== id);
 
-  await writeFile(DISMISSED_FILE, JSON.stringify({ dismissed }, null, 2) + '\n');
+  await saveDismissed(dismissed);
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { 'Content-Type': 'application/json' },

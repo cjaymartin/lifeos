@@ -2,12 +2,20 @@
 // components; browser-safe types/constants are in src/lib/deliveries-types.ts.
 import { readFile, stat } from 'fs/promises';
 import { join } from 'path';
+import { writeJson } from '@/lib/content-store';
 import type { DeliveriesData } from '@/features/deliveries/types';
 
 export type * from '@/features/deliveries/types';
 
 export const DELIVERIES_FILE = join(process.cwd(), 'src/content/deliveries/deliveries.json');
 export const DISMISSED_FILE = join(process.cwd(), 'src/content/deliveries/dismissed.json');
+
+export interface Dismissal { id: string; dismissedAt: string }
+
+/** Atomically persist the dismissed list (the dismiss/restore write seam). */
+export async function saveDismissed(dismissed: Dismissal[]): Promise<void> {
+  await writeJson(DISMISSED_FILE, { dismissed });
+}
 
 /** Read deliveries.json with dismissed entries filtered out. Null if no sync has run yet. */
 export async function loadDeliveries(): Promise<DeliveriesData | null> {

@@ -1,7 +1,8 @@
 // Server-only helpers for the Grocery stack — do NOT import from client
 // components; browser-safe types/constants are in src/lib/grocery-types.ts.
-import { readFile, writeFile, unlink } from 'fs/promises';
+import { readFile, unlink } from 'fs/promises';
 import { join } from 'path';
+import { writeJson } from '@/lib/content-store';
 import type {
   CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, ProductRef, PurchaseRecord, Retailer, Staple,
 } from '@/features/grocery/types';
@@ -26,10 +27,6 @@ export const SCAN_RESULTS_FILE = join(DIR, '.scan-results.json');
 
 async function readJson<T>(path: string): Promise<T | null> {
   try { return JSON.parse(await readFile(path, 'utf-8')) as T; } catch { return null; }
-}
-
-async function writeJson(path: string, data: unknown): Promise<void> {
-  await writeFile(path, JSON.stringify(data, null, 2) + '\n');
 }
 
 export async function loadGrocery(): Promise<GroceryData> {

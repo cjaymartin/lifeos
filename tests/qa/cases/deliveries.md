@@ -8,7 +8,7 @@ Expected: h1 + first vendor visible.
 Last pass: 2026-06-06 · Status: pass
 
 ### DEL-2 — dismiss and restore round-trips through dismissed.json
-Steps: dismiss a visible delivery, expand Dismissed, restore it; poll the file (tolerating mid-write reads — the store's write is not atomic, issue #7).
+Steps: dismiss a visible delivery, expand Dismissed, restore it; poll the file (the store's write is now atomic — temp + rename, NIM-6 / issue #7; the poll keeps mid-write tolerance as belt-and-suspenders).
 Expected: dismissed.json count goes +1 then back.
 Last pass: 2026-06-06 · Status: pass
 
