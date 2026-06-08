@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   ChevronRight,
@@ -75,18 +75,35 @@ export default function Sidebar({ stacks, currentPath }: Props) {
     return false;
   });
 
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('theme') as 'dark' | 'light') ?? 'dark';
-    }
-    return 'dark';
-  });
+  // Always seed to 'dark' so the first client render matches the SSR markup
+  // (SSR has no `window`, so it always renders 'dark'). Reading localStorage in
+  // the initializer would diverge from SSR on a `theme=light` client → React
+  // #418 hydration mismatch on every page load (NIM-9 / #4). The real stored
+  // theme is adopted post-mount in the effect below.
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(collapsed));
   }, [collapsed]);
 
+  // After mount, adopt the theme the AppLayout inline FOUC script already
+  // applied to <html> (sourced from localStorage). This corrects the toggle
+  // control to reflect the active theme without affecting the hydration markup.
   useEffect(() => {
+    const stored = (localStorage.getItem('theme') as 'dark' | 'light') ?? 'dark';
+    setTheme(stored);
+  }, []);
+
+  // Apply + persist the theme whenever the user toggles it. Skip the initial
+  // mount: the inline FOUC script already set the class and localStorage, and on
+  // mount `theme` is still the SSR default ('dark') which may not match the
+  // stored value yet — writing here would clobber it and flash the page.
+  const themeMounted = useRef(false);
+  useEffect(() => {
+    if (!themeMounted.current) {
+      themeMounted.current = true;
+      return;
+    }
     const root = document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
     root.classList.toggle('light', theme === 'light');
