@@ -70,11 +70,8 @@ export async function verifyTodoistToken(token: string): Promise<{ ok: boolean; 
 }
 
 async function runApiTokenVerify(account: AccountDef): Promise<void> {
-  const token =
-    getAccountSecrets(account.id).token ??
-    (import.meta as any).env?.TODOIST_API_TOKEN ??
-    process.env.TODOIST_API_TOKEN ??
-    '';
+  // process.env ONLY — never import.meta.env (baked into dist/ at build, NIM-7).
+  const token = getAccountSecrets(account.id).token ?? process.env.TODOIST_API_TOKEN ?? '';
   if (!token.trim()) {
     await setAccountStatus(account.id, 'needs-attention', 'No API token saved yet');
     return;

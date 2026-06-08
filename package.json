@@ -13,8 +13,9 @@
     "populate-daily": "node --experimental-strip-types scripts/populate-daily.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "astro build && playwright test",
-    "test:e2e:only": "playwright test"
+    "test:e2e": "astro build && playwright test && npm run test:e2e:mutations -- --skip-build",
+    "test:e2e:only": "playwright test",
+    "test:e2e:mutations": "node scripts/e2e-mutations.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^10.1.3",

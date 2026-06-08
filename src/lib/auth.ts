@@ -3,9 +3,14 @@ import { createHmac } from 'crypto';
 /** The session cookie's name — owned here; no caller should hardcode it. */
 export const SESSION_COOKIE = 'lifeos_session';
 
-/** Resolve the session secret the same way everywhere (build-time env first). */
+/**
+ * Resolve the session secret. process.env ONLY — never import.meta.env, which
+ * `astro build` inlines into dist/ and would bake a real secret into the build
+ * (NIM-7). The container provides it at runtime via env_file; the test server
+ * sets process.env.SESSION_SECRET to match the cookie it mints.
+ */
 export function getSessionSecret(): string {
-  return (import.meta as any).env?.SESSION_SECRET ?? process.env.SESSION_SECRET ?? '';
+  return process.env.SESSION_SECRET ?? '';
 }
 
 export function makeSessionToken(secret: string): string {

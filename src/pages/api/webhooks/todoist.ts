@@ -19,8 +19,8 @@ import { syncNow } from '@/features/tasks/ops/sync-loop';
  * delivery. Without TODOIST_WEBHOOK_SECRET set it answers 501 and does nothing.
  */
 export const POST: APIRoute = async ({ request }) => {
-  const secret =
-    (import.meta as any).env?.TODOIST_WEBHOOK_SECRET ?? process.env.TODOIST_WEBHOOK_SECRET ?? '';
+  // process.env ONLY — never import.meta.env (baked into dist/ at build, NIM-7).
+  const secret = process.env.TODOIST_WEBHOOK_SECRET ?? '';
   if (!secret.trim()) return new Response('Webhook not configured', { status: 501 });
 
   const raw = await request.text();
