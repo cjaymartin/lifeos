@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import {
   loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, syncStapleToList, renameInProductMap,
+  loadCategoryMap, resolveCategory, learnCategory,
 } from '@/features/grocery/ops';
 import { normalizeName, DEFAULT_CATEGORIES, STAPLE_STATUS_ORDER } from '@/features/grocery/types';
 import type { RestockAt, Retailer, StapleStatus } from '@/features/grocery/types';
@@ -28,10 +29,12 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (staples.some(s => normalizeName(s.name) === normalizeName(name)))
     return json({ ok: true, duplicate: true });
 
-  const cat = category && (DEFAULT_CATEGORIES as readonly string[]).includes(category) ? category : 'Other';
+  const explicit = category && (DEFAULT_CATEGORIES as readonly string[]).includes(category) ? category : null;
+  const [cat] = explicit ? [explicit] : resolveCategory(name, await loadCategoryMap());
   const staple = { id: makeItemId(name), name, category: cat, status: 'stocked' as StapleStatus };
   staples.push(staple);
   await saveStaples(staples);
+  if (explicit) await learnCategory(name, explicit);
 
   // Mark any matching list item as a staple
   const grocery = await loadGrocery();
@@ -82,6 +85,7 @@ export const PATCH: APIRoute = async ({ cookies, request }) => {
     staple.name = body.name.trim();
   }
   await saveStaples(staples);
+  if (body.category) await learnCategory(staple.name, body.category); // remember the override
 
   const grocery = await loadGrocery();
   let groceryDirty = false;

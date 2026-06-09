@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import {
-  loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, renameInProductMap,
+  loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, renameInProductMap, learnCategory,
 } from '@/features/grocery/ops';
 import { normalizeName, DEFAULT_CATEGORIES } from '@/features/grocery/types';
 import type { Retailer } from '@/features/grocery/types';
@@ -71,6 +71,7 @@ export const PATCH: APIRoute = async ({ cookies, request, params }) => {
   if (typeof body.category === 'string' && (DEFAULT_CATEGORIES as readonly string[]).includes(body.category)) {
     item.category = body.category;
     item.categoryConfirmed = true; // user said so
+    await learnCategory(item.name, body.category); // and remember it for next time
   }
 
   // Toggling the star keeps staples.json in sync

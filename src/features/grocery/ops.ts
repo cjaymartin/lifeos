@@ -5,7 +5,7 @@ import { join } from 'path';
 import type {
   CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, ProductRef, PurchaseRecord, Retailer, Staple,
 } from '@/features/grocery/types';
-import { buildAddToCartUrl, normalizeName, RETAILER_LABELS } from '@/features/grocery/types';
+import { buildAddToCartUrl, normalizeName, RETAILER_LABELS, DEFAULT_CATEGORIES } from '@/features/grocery/types';
 
 export type * from '@/features/grocery/types';
 
@@ -15,6 +15,11 @@ export const STAPLES_FILE = join(DIR, 'staples.json');
 export const CARTS_FILE = join(DIR, 'carts.json');
 export const PURCHASES_FILE = join(DIR, 'purchases.json');
 export const PRODUCT_MAP_FILE = join(DIR, 'product-map.json');
+// Learned category memory: normalized item name → category. Consulted before
+// the keyword heuristic; written on user override and agent confirmation.
+export const CATEGORY_MAP_FILE = join(DIR, 'category-map.json');
+// One-shot marker so the "re-file existing Other staples" migration runs once.
+const CATEGORIES_MIGRATED_FILE = join(DIR, '.categories-migrated');
 // Optional per-build item selection, written by the build-carts API and read
 // by the /build-carts skill (absent → build for all unchecked items)
 export const CART_REQUEST_FILE = join(DIR, 'cart-request.json');
@@ -123,8 +128,8 @@ const KEYWORD_CATEGORIES: [string, string[]][] = [
   ['Frozen', ['frozen', 'ice cream', 'pizza', 'popsicle', 'waffles', 'fries', 'nugget', 'ice']],
   ['Beverages', ['water', 'soda', 'juice', 'coffee', 'tea', 'beer', 'wine', 'kombucha', 'sparkling', 'lemonade', 'gatorade', 'energy drink', 'cola', 'seltzer']],
   ['Snacks', ['chip', 'pretzel', 'popcorn', 'candy', 'cookie', 'granola bar', 'trail mix', 'nuts', 'almond', 'cashew', 'snack', 'gummy', 'fruit snack', 'goldfish']],
-  ['Household', ['paper towel', 'toilet paper', 'trash bag', 'garbage bag', 'dish soap', 'detergent', 'laundry', 'sponge', 'cleaner', 'bleach', 'wipes', 'foil', 'plastic wrap', 'ziploc', 'storage bag', 'batteries', 'light bulb', 'napkin', 'air freshener', 'swiffer', 'dishwasher']],
-  ['Personal Care', ['shampoo', 'conditioner', 'soap', 'body wash', 'toothpaste', 'toothbrush', 'deodorant', 'razor', 'shaving', 'lotion', 'sunscreen', 'floss', 'mouthwash', 'tylenol', 'advil', 'ibuprofen', 'vitamin', 'band-aid', 'medicine', 'allergy', 'q-tip', 'tissue', 'kleenex']],
+  ['Household', ['paper towel', 'toilet paper', 'trash bag', 'garbage bag', 'dish soap', 'detergent', 'laundry', 'sponge', 'cleaner', 'bleach', 'wipes', 'foil', 'plastic wrap', 'ziploc', 'storage bag', 'batteries', 'light bulb', 'napkin', 'air freshener', 'swiffer', 'dishwasher', 'paper plate', 'paper bowl', 'plate', 'bowl', 'cup', 'cutlery', 'fork', 'spoon', 'knife', 'straw', 'utensil']],
+  ['Personal Care', ['shampoo', 'conditioner', 'soap', 'body wash', 'toothpaste', 'toothbrush', 'deodorant', 'razor', 'shaving', 'lotion', 'sunscreen', 'floss', 'mouthwash', 'tylenol', 'advil', 'ibuprofen', 'ibuprofin', 'acetaminophen', 'aspirin', 'antacid', 'psyllium', 'fiber', 'supplement', 'probiotic', 'vitamin', 'band-aid', 'bandage', 'medicine', 'allergy', 'q-tip', 'tissue', 'kleenex']],
 ];
 
 /** Returns [category, confirmed] — confirmed false means the micro-agent should look. */
@@ -134,6 +139,48 @@ export function categorizeHeuristic(name: string): [string, boolean] {
     if (keywords.some(k => n.includes(k))) return [category, true];
   }
   return ['Other', false];
+}
+
+export async function loadCategoryMap(): Promise<Record<string, string>> {
+  return (await readJson<Record<string, string>>(CATEGORY_MAP_FILE)) ?? {};
+}
+
+export async function saveCategoryMap(map: Record<string, string>): Promise<void> {
+  await writeJson(CATEGORY_MAP_FILE, map);
+}
+
+/** Resolve a category: a learned override wins (confirmed), else the keyword
+ *  heuristic, else ['Other', false] → the categorize micro-agent takes a pass. */
+export function resolveCategory(name: string, categoryMap: Record<string, string>): [string, boolean] {
+  const learned = categoryMap[normalizeName(name)];
+  if (learned && (DEFAULT_CATEGORIES as readonly string[]).includes(learned)) return [learned, true];
+  return categorizeHeuristic(name);
+}
+
+/** Persist a user/agent category decision so the same name is decided once. */
+export async function learnCategory(name: string, category: string): Promise<void> {
+  if (!(DEFAULT_CATEGORIES as readonly string[]).includes(category)) return;
+  const map = await loadCategoryMap();
+  const key = normalizeName(name);
+  if (map[key] === category) return;
+  map[key] = category;
+  await saveCategoryMap(map);
+}
+
+/** One-time, idempotent: re-file staples sitting in "Other" that the resolver
+ *  can now place (the root cause of milk/paper-plates/psyllium reading "Other").
+ *  Guarded by a marker file so it never fights a deliberate later choice. */
+async function migrateStapleCategories(): Promise<void> {
+  if (await readJson<unknown>(CATEGORIES_MIGRATED_FILE) !== null) return;
+  const [staples, categoryMap] = await Promise.all([loadStaples(), loadCategoryMap()]);
+  let dirty = false;
+  for (const s of staples) {
+    if (s.category !== 'Other') continue;
+    const [cat, confirmed] = resolveCategory(s.name, categoryMap);
+    if (confirmed && cat !== 'Other') { s.category = cat; dirty = true; }
+  }
+  if (dirty) await saveStaples(staples);
+  await writeJson(CATEGORIES_MIGRATED_FILE, { migratedAt: new Date().toISOString() });
 }
 
 /* ── Reconcile pending agent output ────────────────────────────────────────
@@ -152,23 +199,32 @@ interface ScanResults {
 }
 
 export async function loadGroceryState(): Promise<GroceryState> {
+  await migrateStapleCategories(); // one-time re-file of "Other" staples
   const [grocery, staples, carts, productMap] = await Promise.all([
     loadGrocery(), loadStaples(), loadCarts(), loadProductMap(),
   ]);
   let groceryDirty = false;
   let staplesDirty = false;
 
-  // 1. Apply micro-agent category assignments
+  // 1. Apply micro-agent category assignments (and remember them so each name
+  //    is only ever decided once)
   const categorized = await readJson<Record<string, string>>(CATEGORIZED_FILE);
   if (categorized) {
+    const categoryMap = await loadCategoryMap();
+    let mapDirty = false;
     for (const item of grocery.items) {
       const cat = categorized[item.id];
       if (cat && !item.categoryConfirmed) {
         item.category = cat;
         item.categoryConfirmed = true;
         groceryDirty = true;
+        if ((DEFAULT_CATEGORIES as readonly string[]).includes(cat) && categoryMap[normalizeName(item.name)] !== cat) {
+          categoryMap[normalizeName(item.name)] = cat;
+          mapDirty = true;
+        }
       }
     }
+    if (mapDirty) await saveCategoryMap(categoryMap);
     try { await unlink(CATEGORIZED_FILE); } catch {}
   }
 
