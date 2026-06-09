@@ -16,6 +16,11 @@ Last pass: 2026-06-08 · Status: pass
 Expected: `.dark` back on `<html>`.
 Last pass: 2026-06-08 · Status: pass
 
+### THEME-4 — collapsed sidebar stored: no hydration/page errors across pages
+Steps: persist `sidebar-collapsed=true`, then sweep `/tasks`, `/grocery`, `/deliveries`, `/recipes`.
+Expected: zero errors. FIXED (#20, sibling of NIM-9 / #4): Sidebar now seeds `useState(false)` (expanded, matching SSR `w-56`) and adopts the stored collapsed value in a post-mount effect, so the first client render agrees with the SSR markup — no React #418 reflow on collapsed-stored clients. Covered by `tests/unit/sidebar-collapsed-hydration.test.tsx`.
+Last pass: 2026-06-08 · Status: pass
+
 ### THEME-M1 — visual review of screenshots
 Steps: review `tests/qa/.artifacts/` and shot scripts' output for both themes.
 Expected: no layout breakage, contrast issues, or unstyled regions.

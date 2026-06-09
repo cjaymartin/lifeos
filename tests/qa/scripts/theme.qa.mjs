@@ -35,4 +35,27 @@ await qa.check('THEME-3', 'toggle back to dark restores cleanly', async (page) =
   if (!isDark) throw new Error('html did not get .dark class back');
 });
 
+await qa.check('THEME-4', 'collapsed sidebar stored: no hydration/page errors across pages', async (page) => {
+  // Fixed #20 (sibling of NIM-9 / #4): Sidebar seeds collapsed=false to match
+  // SSR (always expanded w-56) and adopts the stored value in a post-mount
+  // effect, so the first client render agrees with the SSR markup → no React
+  // #418 even when `sidebar-collapsed=true`. Unit-covered in
+  // sidebar-collapsed-hydration.test.tsx. Persist the collapsed preference
+  // before loading, then sweep routes asserting a clean console.
+  await page.goto(BASE + '/');
+  await page.evaluate(() => localStorage.setItem('sidebar-collapsed', 'true'));
+  const before = qa.consoleErrors.length;
+  try {
+    for (const p of ['/tasks', '/grocery', '/deliveries', '/recipes']) {
+      await page.goto(BASE + p);
+      await page.waitForTimeout(700);
+    }
+    const errs = qa.consoleErrors.slice(before);
+    if (errs.length) throw new Error(`${errs.length} errors, first: ${errs[0].text.slice(0, 120)}`);
+  } finally {
+    // Restore the expanded default so it doesn't leak into other runs/areas.
+    await page.evaluate(() => localStorage.setItem('sidebar-collapsed', 'false'));
+  }
+});
+
 await qa.finish();
