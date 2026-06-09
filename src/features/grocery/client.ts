@@ -45,6 +45,10 @@ export const groceryClient = {
       body: { retailer, addedItemIds },
     }),
 
+  /* out-of-stock substitution */
+  acceptSubstitute: (retailer: Retailer, itemId: string, productId: string) =>
+    apiCall('/api/grocery/substitute', { method: 'POST', body: { retailer, itemId, productId } }),
+
   /* checkout */
   checkout: (body: { retailer?: Retailer; itemIds?: string[] }) =>
     apiCall('/api/grocery/checkout', { method: 'POST', body }),

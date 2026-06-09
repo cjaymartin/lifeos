@@ -92,4 +92,34 @@ test.describe('grocery stack', () => {
       })
       .toEqual([1, null]);
   });
+
+  test('an out-of-stock line offers a substitute that gets applied', async ({ page }) => {
+    writeSandboxJson('src/content/grocery/carts.json', {
+      builtAt: '2026-06-09T00:00:00.000Z',
+      carts: [{
+        retailer: 'walmart',
+        label: 'Walmart',
+        unmatched: [],
+        items: [{
+          itemId: 'oos-1', name: 'Oos Dragonfruit', productId: 'OOS1', product: 'Fresh Dragonfruit', price: '$7.00', qty: 1,
+          status: 'out_of_stock',
+          alternatives: [{ productId: 'ALT9', product: 'Frozen Dragonfruit', size: '10 oz', price: '$6.00', productUrl: 'https://www.walmart.com/ip/ALT9' }],
+        }],
+      }],
+    });
+
+    await page.goto('/grocery');
+    await expect(page.getByText('Built carts')).toBeVisible();
+    await expect(page.getByText('out of stock')).toBeVisible();
+
+    await page.getByRole('button', { name: /Frozen Dragonfruit/ }).click();
+
+    await expect
+      .poll(() => {
+        const c = readSandboxJson<{ carts: any[] }>('src/content/grocery/carts.json');
+        const line = c.carts[0].items[0];
+        return [line.productId, line.status, line.substituted];
+      })
+      .toEqual(['ALT9', 'ok', true]);
+  });
 });

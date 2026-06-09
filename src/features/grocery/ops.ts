@@ -466,6 +466,44 @@ export async function reconcileCartAdds(
   return { ok: true, inCart };
 }
 
+/* ── Out-of-stock substitution ─────────────────────────────────────────────
+   The user picks one of the agent's ranked alternatives for an out-of-stock
+   line. We swap the line's product, mark it back to pending (it's a different
+   product now), rebuild the cart link, and remember the choice as a learned
+   product so the next build resolves it instantly (never overwriting a pin). */
+export async function acceptSubstitute(
+  retailer: Retailer,
+  itemId: string,
+  productId: string,
+): Promise<{ ok: boolean }> {
+  const carts = await loadCarts();
+  const cart = carts?.carts.find(c => c.retailer === retailer);
+  if (!carts || !cart) return { ok: false };
+  const line = cart.items.find(m => m.itemId === itemId);
+  if (!line) return { ok: false };
+  const alt = (line.alternatives ?? []).find(a => a.productId === productId);
+  if (!alt) return { ok: false };
+
+  line.productId = alt.productId;
+  line.product = alt.product;
+  line.price = alt.price;
+  line.productUrl = alt.productUrl;
+  line.status = 'ok';
+  line.substituted = true;
+  line.source = 'new';
+  line.confidence = 'medium';
+  delete line.addedQty; // different product → pending again
+  delete line.alternatives;
+  cart.cartUrl = rebuildCartUrl(cart);
+  await saveCarts(carts);
+
+  const map = await loadProductMap();
+  if (learnProduct(map, line.name, { retailer, productId: alt.productId, product: alt.product, productUrl: alt.productUrl })) {
+    await saveProductMap(map);
+  }
+  return { ok: true };
+}
+
 /* ── Checkout ──────────────────────────────────────────────────────────────
    Remove purchased items from the list, restock matching staples, and log
    to purchases.json. Used by the cart "I checked out" buttons and the

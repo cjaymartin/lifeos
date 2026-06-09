@@ -642,6 +642,11 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
       return { ...s, carts: carts.length ? { ...s.carts, carts } : null };
     }, () => groceryClient.dismissCart(retailer)), [mutate]);
 
+  /** Swap an out-of-stock line to one of the agent's ranked alternatives. */
+  const acceptSubstitute = useCallback((retailer: Retailer, itemId: string, productId: string) =>
+    mutate(s => s, () => groceryClient.acceptSubstitute(retailer, itemId, productId), { sync: 'always' }),
+    [mutate]);
+
   /** Forget the whole cart's added-state (the add didn't go through at all —
    *  bot check, login wall, emptied cart) so the full add is offered again. */
   const resetCartAdded = useCallback((retailer: Retailer) =>
@@ -936,7 +941,7 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
               // Lines not yet pushed to the retailer cart (or with a qty bump)
               const pending = cart.items.filter(
                 (m): m is typeof m & { productId: string } =>
-                  !!m.productId && (m.qty ?? 1) > (m.addedQty ?? 0),
+                  !!m.productId && (m.qty ?? 1) > (m.addedQty ?? 0) && m.status !== 'out_of_stock',
               );
               const addUrl = buildAddToCartUrl(
                 cart.retailer,
@@ -967,40 +972,68 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                   </span>
                 </div>
                 <ul className="space-y-1.5">
-                  {cart.items.map(m => (
-                    <li key={m.itemId} className="group/cartitem flex items-start gap-1 text-xs leading-relaxed">
-                      <span className="flex-1 min-w-0">
-                        <span className="text-foreground">{m.name}</span>
-                        {m.product && (
-                          <span className="text-muted-foreground"> → {m.product}{m.price ? ` (${m.price})` : ''}</span>
-                        )}
-                        {m.source === 'reorder' && (
-                          <span className="ml-1.5 px-1.5 py-px rounded-full bg-primary/10 text-primary text-[10px] font-medium">reorder</span>
-                        )}
-                        {m.productId && (m.addedQty ?? 0) >= (m.qty ?? 1) && (
-                          <span className="ml-1.5 px-1.5 py-px rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-medium">
-                            <Check className="inline w-2.5 h-2.5 mr-0.5 align-text-top" />in cart
-                          </span>
-                        )}
-                        {m.confidence && (
-                          <span className={`ml-1 ${CONFIDENCE_STYLE[m.confidence] ?? ''}`}>•</span>
-                        )}
-                        {m.productUrl && (
-                          <a href={m.productUrl} target="_blank" rel="noopener noreferrer"
-                             className="ml-1.5 inline-flex items-center text-primary hover:underline align-middle">
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
-                      </span>
-                      <button
-                        onClick={() => removeCartItem(cart.retailer, m.itemId)}
-                        title="Remove from this cart (stays on your list)"
-                        aria-label={`Remove ${m.name} from ${cart.label || cart.retailer} cart`}
-                        className="shrink-0 p-0.5 rounded text-muted-foreground/0 group-hover/cartitem:text-muted-foreground/40 hover:!text-destructive transition-colors">
-                        <X className="w-3 h-3" />
-                      </button>
+                  {cart.items.map(m => {
+                    const oos = m.status === 'out_of_stock';
+                    return (
+                    <li key={m.itemId} className="group/cartitem text-xs leading-relaxed">
+                      <div className="flex items-start gap-1">
+                        <span className="flex-1 min-w-0">
+                          <span className={oos ? 'text-muted-foreground line-through' : 'text-foreground'}>{m.name}</span>
+                          {m.product && (
+                            <span className="text-muted-foreground"> → {m.product}{m.price ? ` (${m.price})` : ''}</span>
+                          )}
+                          {m.source === 'reorder' && (
+                            <span className="ml-1.5 px-1.5 py-px rounded-full bg-primary/10 text-primary text-[10px] font-medium">reorder</span>
+                          )}
+                          {m.substituted && (
+                            <span className="ml-1.5 px-1.5 py-px rounded-full bg-warning-subtle text-warning text-[10px] font-medium">substituted</span>
+                          )}
+                          {oos && (
+                            <span className="ml-1.5 px-1.5 py-px rounded-full bg-warning-subtle text-warning text-[10px] font-medium">
+                              <AlertCircle className="inline w-2.5 h-2.5 mr-0.5 align-text-top" />out of stock
+                            </span>
+                          )}
+                          {!oos && m.productId && (m.addedQty ?? 0) >= (m.qty ?? 1) && (
+                            <span className="ml-1.5 px-1.5 py-px rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-medium">
+                              <Check className="inline w-2.5 h-2.5 mr-0.5 align-text-top" />in cart
+                            </span>
+                          )}
+                          {!oos && m.confidence && (
+                            <span className={`ml-1 ${CONFIDENCE_STYLE[m.confidence] ?? ''}`}>•</span>
+                          )}
+                          {m.productUrl && (
+                            <a href={m.productUrl} target="_blank" rel="noopener noreferrer"
+                               className="ml-1.5 inline-flex items-center text-primary hover:underline align-middle">
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </span>
+                        <button
+                          onClick={() => removeCartItem(cart.retailer, m.itemId)}
+                          title="Remove from this cart (stays on your list)"
+                          aria-label={`Remove ${m.name} from ${cart.label || cart.retailer} cart`}
+                          className="shrink-0 p-0.5 rounded text-muted-foreground/0 group-hover/cartitem:text-muted-foreground/40 hover:!text-destructive transition-colors">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      {oos && (m.alternatives?.length ?? 0) > 0 && (
+                        <div className="mt-1 ml-1 pl-2 border-l-2 border-warning/40 space-y-0.5">
+                          <p className="text-[11px] text-warning">Pick a substitute:</p>
+                          {m.alternatives!.map(a => (
+                            <button key={a.productId}
+                              onClick={() => acceptSubstitute(cart.retailer, m.itemId, a.productId)}
+                              className="block text-left text-[11px] text-foreground hover:text-primary transition-colors">
+                              {a.product}{a.size ? ` · ${a.size}` : ''}{a.price ? ` · ${a.price}` : ''}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {oos && !(m.alternatives?.length) && (
+                        <p className="mt-0.5 ml-1 text-[11px] text-warning/80">No substitute found — remove it or try another retailer.</p>
+                      )}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
                 {cart.unmatched.length > 0 && (
                   <p className="text-xs text-warning">

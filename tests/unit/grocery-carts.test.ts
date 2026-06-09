@@ -209,6 +209,41 @@ describe('checkoutItems — confirmed-purchase learning', () => {
   });
 });
 
+describe('acceptSubstitute', () => {
+  it('swaps an out-of-stock line to the chosen alternative and learns it', async () => {
+    writeJson('grocery.json', { lastUpdated: '', items: [item('df', 'Dragonfruit')] });
+    writeJson('carts.json', {
+      builtAt: 'x',
+      carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [
+        { itemId: 'df', name: 'Dragonfruit', productId: 'OOS1', product: 'Fresh Dragonfruit', qty: 1, status: 'out_of_stock',
+          alternatives: [{ productId: 'ALT9', product: 'Dragonfruit (frozen)', price: '$6.00', productUrl: 'https://www.walmart.com/ip/ALT9' }] },
+      ] }],
+    });
+
+    const res = await grocery.acceptSubstitute('walmart', 'df', 'ALT9');
+    expect(res.ok).toBe(true);
+
+    const line = readJson('carts.json').carts[0].items[0];
+    expect(line.productId).toBe('ALT9');
+    expect(line.status).toBe('ok');
+    expect(line.substituted).toBe(true);
+    expect(line.alternatives).toBeUndefined();
+    expect(line.addedQty).toBeUndefined();
+    // remembered for next time, as a learned (unpinned) product
+    expect(readJson('product-map.json').dragonfruit).toMatchObject({ productId: 'ALT9', pinned: false });
+  });
+
+  it('returns ok:false for an unknown alternative', async () => {
+    writeJson('carts.json', {
+      builtAt: 'x',
+      carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [
+        { itemId: 'df', name: 'Dragonfruit', productId: 'OOS1', qty: 1, status: 'out_of_stock', alternatives: [] },
+      ] }],
+    });
+    expect((await grocery.acceptSubstitute('walmart', 'df', 'NOPE')).ok).toBe(false);
+  });
+});
+
 describe('loadGroceryState — unavailable/refunded scan', () => {
   it('re-adds an unavailable item, refunds its purchase, and resets the staple', async () => {
     writeJson('grocery.json', { lastUpdated: '', items: [] });

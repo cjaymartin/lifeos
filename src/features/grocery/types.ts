@@ -67,6 +67,22 @@ export interface CartMatch {
   confidence?: 'high' | 'medium' | 'low';
   /** 'reorder' = exact product from past orders; 'new' = fresh web match */
   source?: 'reorder' | 'new';
+  /** Stock state of the matched product (absent ⇒ 'ok') */
+  status?: 'ok' | 'out_of_stock' | 'unavailable';
+  /** Ranked fallback products when the match is out of stock */
+  alternatives?: ProductCandidate[];
+  /** The agent auto-picked an alternative — flagged so the UI can surface it */
+  substituted?: boolean;
+}
+
+/** A candidate product the agent surfaced as a possible match/substitute. */
+export interface ProductCandidate {
+  productId: string;
+  product: string;
+  price?: string;
+  productUrl?: string;
+  /** Free-form size/pack ("52 fl oz", "3-pack") to help the size decision */
+  size?: string;
 }
 
 export interface RetailerCart {

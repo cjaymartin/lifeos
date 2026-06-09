@@ -36,6 +36,13 @@ You build links only. **Never** place, submit, or check out an order; never log 
 
 **Verify on the product page (every `source: "new"` match):** `WebFetch` the actual `walmart.com/ip/<id>` (or `amazon.com/dp/<ASIN>`) page and confirm three things — the title matches what you searched for, a current price is shown, and it isn't out of stock / unavailable. Search-result snippets routinely show the wrong price or a different variant (promotions, sellers, pack sizes), and a redirect or title mismatch means the id is wrong — discard and try the next candidate. Only verified matches get confidence `high`; if the page is bot-gated and won't load, keep the match but cap confidence at `medium`. Reorders (priority 1–2) skip verification — the user already bought them.
 
+**Out of stock → offer fallbacks, never silently drop.** If the best product (including a pinned or past-order one) is out of stock / unavailable on its page, do NOT just discard it. Instead:
+- Keep the line but set `"status": "out_of_stock"`.
+- From the same search results, collect **2–3 ranked alternative products** into `"alternatives"` — each `{ "productId", "product", "price", "productUrl", "size" }`, ordered best-first by the same picking rules (normal sizes, higher review count, sold by Walmart).
+- You MAY pre-select the closest in-stock alternative as the line's product (copy its fields up onto the line) and set `"substituted": true` so the cart stays usable — but still include the full `alternatives` so the user can change it.
+- If you genuinely can't find any in-stock alternative, leave the line `"status": "out_of_stock"` with an empty/absent `alternatives` — it surfaces as "needs attention", still never dropped.
+- In-stock matches get `"status": "ok"` (or just omit `status`).
+
 Budget your time: ~5-minute headless window. Gmail lookups are cheap — do them for every item; deep web verification only for the few `new` matches.
 
 ## Step 3 — Write carts.json (MERGE, don't replace)
@@ -66,7 +73,8 @@ Cart links:
           "productId": "123456789",
           "qty": 1,
           "confidence": "high",
-          "source": "reorder"
+          "source": "reorder",
+          "status": "ok"
         }
       ],
       "unmatched": ["dragon fruit"],
@@ -78,6 +86,7 @@ Cart links:
 
 - `itemId` must be the exact `id` from grocery.json — the checkout flow uses it.
 - `productId` is required on every match (Walmart item id / Amazon ASIN) — the UI rebuilds `cartUrl` from these when the user removes items.
+- `status` defaults to `"ok"` when absent. An `"out_of_stock"` line carries `alternatives` (and optionally `substituted: true`) — see the out-of-stock rule in Step 2. Don't put out-of-stock items in `unmatched`.
 - `addedQty` is UI-managed (tracks what the user already pushed to the real retailer cart). Never invent it — but if the **previous** carts.json has a line with the same `productId` carrying `addedQty`, copy it over so a rebuild doesn't cause double-adds.
 - Always write the file, even on a poor run — the UI uses its mtime to detect completion.
 
