@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ShoppingCart, RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Star,
-  ChevronRight, Plus, Loader2, Trash2, ListChecks, Search, Settings,
+  ChevronRight, Plus, Loader2, Trash2, ListChecks, Search, Settings, Pin,
 } from 'lucide-react';
 import type {
   GroceryState, GroceryItem, Staple, StapleStatus, Retailer, CartsData, ProductRef, RestockAt,
@@ -647,6 +647,18 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
     mutate(s => s, () => groceryClient.acceptSubstitute(retailer, itemId, productId), { sync: 'always' }),
     [mutate]);
 
+  /** One-click "always use this" — pin the cart line's exact product so reorders
+   *  never re-guess (pins are never overridden by the agent or learning). */
+  const pinLine = useCallback((retailer: Retailer, m: { name: string; productId?: string; product?: string; productUrl?: string }) => {
+    if (!m.productId) return;
+    const productId = m.productId;
+    return mutate(
+      s => s,
+      () => groceryClient.pinProductById(m.name, { retailer, productId, product: m.product, productUrl: m.productUrl }),
+      { sync: 'always' },
+    );
+  }, [mutate]);
+
   /** Forget the whole cart's added-state (the add didn't go through at all —
    *  bot check, login wall, emptied cart) so the full add is offered again. */
   const resetCartAdded = useCallback((retailer: Retailer) =>
@@ -1013,6 +1025,21 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                             </a>
                           )}
                         </span>
+                        {m.productId && !oos && (() => {
+                          const pinnedRef = state.productMap?.[normalizeName(m.name)];
+                          const isPinned = !!pinnedRef?.pinned && pinnedRef.productId === m.productId;
+                          return (
+                            <button
+                              onClick={() => pinLine(cart.retailer, m)}
+                              title={isPinned ? 'Always used for this item' : 'Always use this exact product for this item'}
+                              aria-label={`Always use ${m.product ?? m.name} for ${m.name}`}
+                              className={`shrink-0 p-0.5 rounded transition-colors ${
+                                isPinned ? 'text-primary' : 'text-muted-foreground/0 group-hover/cartitem:text-muted-foreground/40 hover:!text-primary'
+                              }`}>
+                              <Pin className="w-3 h-3" fill={isPinned ? 'currentColor' : 'none'} />
+                            </button>
+                          );
+                        })()}
                         <button
                           onClick={() => removeCartItem(cart.retailer, m.itemId)}
                           title="Remove from this cart (stays on your list)"

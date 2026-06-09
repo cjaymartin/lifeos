@@ -1,28 +1,45 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { loadProductMap, saveProductMap, parseProductUrl } from '@/features/grocery/ops';
+import { loadProductMap, saveProductMap, parseProductUrl, setPin } from '@/features/grocery/ops';
 import { normalizeName } from '@/features/grocery/types';
+import type { Retailer } from '@/features/grocery/types';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
-/** POST /api/grocery/product-map — { name, url }: pin an exact retailer
- *  product to an item/staple name. build-carts treats pinned entries as
- *  authoritative. */
+/** POST /api/grocery/product-map — pin an exact retailer product to an
+ *  item/staple name. Two forms (build-carts treats pinned entries as
+ *  authoritative):
+ *   - { name, url }: paste a walmart.com/ip/… or amazon.com/dp/… link
+ *   - { name, retailer, productId, product?, productUrl? }: one-click "Always
+ *     use this" from a built cart line. */
 export const POST: APIRoute = async ({ cookies, request }) => {
   const denied = requireSession(cookies);
   if (denied) return denied;
 
-  let name: string, url: string;
+  let name: string;
+  let body: { name?: string; url?: string; retailer?: Retailer; productId?: string; product?: string; productUrl?: string };
   try {
-    const body = await request.json() as { name: string; url: string };
+    body = await request.json();
     name = String(body.name ?? '').trim();
-    url = String(body.url ?? '').trim();
-    if (!name || !url) throw new Error();
+    if (!name) throw new Error();
   } catch {
     return new Response('Bad request', { status: 400 });
   }
 
+  // Form A: pin by exact productId (from a cart line)
+  if (body.retailer && body.productId) {
+    if (!['walmart', 'amazon'].includes(body.retailer)) return new Response('Bad request', { status: 400 });
+    const pin = await setPin(name, {
+      retailer: body.retailer, productId: String(body.productId),
+      product: body.product, productUrl: body.productUrl,
+    });
+    return json({ name: normalizeName(name), ref: pin }, 201);
+  }
+
+  // Form B: pin by pasted URL
+  const url = String(body.url ?? '').trim();
+  if (!url) return new Response('Bad request', { status: 400 });
   const ref = parseProductUrl(url);
   if (!ref) {
     return json({ error: 'Could not parse that link — paste a walmart.com/ip/… or amazon.com/dp/… product URL.' }, 422);

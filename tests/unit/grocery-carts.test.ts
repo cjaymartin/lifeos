@@ -208,6 +208,17 @@ describe('learnProduct', () => {
   });
 });
 
+describe('setPin', () => {
+  it('pins a product by id (authoritative) — learning cannot overwrite it', async () => {
+    await grocery.setPin('Milk', { retailer: 'walmart', productId: 'PIN1', product: 'Fairlife', productUrl: 'u' });
+    expect(readJson('product-map.json').milk).toMatchObject({ productId: 'PIN1', pinned: true });
+    // a later learned write is refused
+    const map = readJson('product-map.json');
+    expect(grocery.learnProduct(map, 'Milk', { retailer: 'walmart', productId: 'OTHER' })).toBe(false);
+    expect(map.milk.productId).toBe('PIN1');
+  });
+});
+
 describe('checkoutItems — confirmed-purchase learning', () => {
   it('learns the exact product from the built cart line', async () => {
     writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });

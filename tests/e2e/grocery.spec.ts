@@ -134,6 +134,30 @@ test.describe('grocery stack', () => {
     await expect(page.getByText('in cart')).toBeVisible();
   });
 
+  test('one-click pin from a cart line locks the exact product', async ({ page }) => {
+    writeSandboxJson('src/content/grocery/carts.json', {
+      builtAt: '2026-06-09T00:00:00.000Z',
+      carts: [{
+        retailer: 'walmart',
+        label: 'Walmart',
+        unmatched: [],
+        items: [{ itemId: 'pin-1', name: 'Pin Cereal', product: 'GV Cereal', price: '$3.00', productId: 'PC1', productUrl: 'https://www.walmart.com/ip/PC1', qty: 1, source: 'reorder' }],
+      }],
+    });
+
+    await page.goto('/grocery');
+    await expect(page.getByText('Built carts')).toBeVisible();
+
+    await page.getByRole('button', { name: /Always use/ }).click();
+
+    await expect
+      .poll(() => {
+        const m = readSandboxJson<Record<string, any>>('src/content/grocery/product-map.json');
+        return m['pin cereal'] ?? null;
+      })
+      .toMatchObject({ productId: 'PC1', pinned: true });
+  });
+
   test('an out-of-stock line offers a substitute that gets applied', async ({ page }) => {
     writeSandboxJson('src/content/grocery/carts.json', {
       builtAt: '2026-06-09T00:00:00.000Z',

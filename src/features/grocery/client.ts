@@ -25,6 +25,9 @@ export const groceryClient = {
   /* product pins */
   pinProduct: (name: string, url: string) =>
     apiCall('/api/grocery/product-map', { method: 'POST', body: { name, url } }),
+  /** One-click pin of an exact product (from a built cart line). */
+  pinProductById: (name: string, ref: { retailer: Retailer; productId: string; product?: string; productUrl?: string }) =>
+    apiCall('/api/grocery/product-map', { method: 'POST', body: { name, ...ref } }),
   clearPin: (name: string) => apiCall('/api/grocery/product-map', { method: 'DELETE', body: { name } }),
 
   /* carts */

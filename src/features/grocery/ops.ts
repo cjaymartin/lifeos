@@ -76,6 +76,23 @@ export async function saveProductMap(map: Record<string, ProductRef>): Promise<v
   await writeJson(PRODUCT_MAP_FILE, map);
 }
 
+/** Pin an exact product to an item name by id (authoritative — agents and
+ *  learned writes never override a pin). Used by the one-click "Always use
+ *  this" on a cart line and the paste-a-URL flow. */
+export async function setPin(
+  name: string,
+  ref: { retailer: Retailer; productId: string; product?: string; productUrl?: string },
+): Promise<ProductRef> {
+  const map = await loadProductMap();
+  const pin: ProductRef = {
+    retailer: ref.retailer, productId: ref.productId,
+    product: ref.product, productUrl: ref.productUrl, pinned: true,
+  };
+  map[normalizeName(name)] = pin;
+  await saveProductMap(map);
+  return pin;
+}
+
 /** Parse a Walmart/Amazon product URL into a ProductRef (null if unrecognized). */
 export function parseProductUrl(url: string): Omit<ProductRef, 'pinned'> | null {
   let u: URL;
