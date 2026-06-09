@@ -93,6 +93,47 @@ test.describe('grocery stack', () => {
       .toEqual([1, null]);
   });
 
+  test('observed-cart ingest reconciles the cart (auto-fill)', async ({ page }) => {
+    writeSandboxJson('src/content/grocery/carts.json', {
+      builtAt: '2026-06-09T00:00:00.000Z',
+      carts: [{
+        retailer: 'walmart',
+        label: 'Walmart',
+        unmatched: [],
+        items: [
+          { itemId: 'obs-a', name: 'Obs Apples', product: 'Apples', price: '$3.00', productId: 'PA', qty: 1, source: 'reorder' },
+          { itemId: 'obs-b', name: 'Obs Bread', product: 'Bread', price: '$2.00', productId: 'PB', qty: 1, source: 'reorder' },
+        ],
+      }],
+    });
+
+    await page.goto('/grocery');
+    await expect(page.getByText('Built carts')).toBeVisible();
+
+    // The bookmarklet posts what's really in the Walmart cart — only Apples (PA)
+    const resp = await page.request.post('/api/grocery/carts/observed', {
+      data: { retailer: 'walmart', items: [{ productId: 'PA' }] },
+    });
+    expect(resp.ok()).toBeTruthy();
+    expect((await resp.json()).inCart).toBe(1);
+
+    // Apples marked in-cart, Bread reset to pending
+    await expect
+      .poll(() => {
+        const c = readSandboxJson<{ carts: any[] }>('src/content/grocery/carts.json');
+        const items = c.carts[0].items;
+        return [
+          items.find((i) => i.itemId === 'obs-a').addedQty ?? null,
+          items.find((i) => i.itemId === 'obs-b').addedQty ?? null,
+        ];
+      })
+      .toEqual([1, null]);
+
+    // UI reflects the observation after a reload
+    await page.reload();
+    await expect(page.getByText('in cart')).toBeVisible();
+  });
+
   test('an out-of-stock line offers a substitute that gets applied', async ({ page }) => {
     writeSandboxJson('src/content/grocery/carts.json', {
       builtAt: '2026-06-09T00:00:00.000Z',

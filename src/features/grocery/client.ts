@@ -44,6 +44,13 @@ export const groceryClient = {
       method: 'POST',
       body: { retailer, addedItemIds },
     }),
+  /** Ingest the real retailer cart observed in the user's own session
+   *  (bookmarklet/extension) → reconcile per line. */
+  observeCart: (retailer: Retailer, items: { productId: string; qty?: number; product?: string; price?: string }[]) =>
+    apiCall<{ ok: boolean; inCart: number; unknown: string[] }>('/api/grocery/carts/observed', {
+      method: 'POST',
+      body: { retailer, items },
+    }),
 
   /* out-of-stock substitution */
   acceptSubstitute: (retailer: Retailer, itemId: string, productId: string) =>

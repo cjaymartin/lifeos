@@ -466,6 +466,32 @@ export async function reconcileCartAdds(
   return { ok: true, inCart };
 }
 
+/** Reconcile from the REAL retailer cart, observed in the user's own browser
+ *  session (bookmarklet/extension) and POSTed here — we never read it
+ *  server-side (hard rule: no login). Match observed productIds to cart lines:
+ *  present ⇒ addedQty = qty (it landed); absent ⇒ cleared (didn't). Returns the
+ *  observed productIds that aren't on this list (info only). */
+export async function applyObservedCart(
+  retailer: Retailer,
+  observed: { productId: string; qty?: number }[],
+): Promise<{ ok: boolean; inCart: number; unknown: string[] }> {
+  const carts = await loadCarts();
+  const cart = carts?.carts.find(c => c.retailer === retailer);
+  if (!carts || !cart) return { ok: false, inCart: 0, unknown: [] };
+
+  const obs = new Set(observed.map(o => String(o.productId)).filter(Boolean));
+  const cartProductIds = new Set(cart.items.map(m => m.productId).filter(Boolean) as string[]);
+  let inCart = 0;
+  for (const m of cart.items) {
+    if (!m.productId) continue;
+    if (obs.has(m.productId)) { m.addedQty = m.qty ?? 1; inCart++; }
+    else delete m.addedQty;
+  }
+  await saveCarts(carts);
+  const unknown = [...obs].filter(pid => !cartProductIds.has(pid));
+  return { ok: true, inCart, unknown };
+}
+
 /* ── Out-of-stock substitution ─────────────────────────────────────────────
    The user picks one of the agent's ranked alternatives for an out-of-stock
    line. We swap the line's product, mark it back to pending (it's a different

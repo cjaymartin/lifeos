@@ -165,6 +165,30 @@ describe('reconcileCartAdds', () => {
   });
 });
 
+describe('applyObservedCart', () => {
+  it('marks observed lines in-cart, clears the rest, and reports unknowns', async () => {
+    writeJson('carts.json', {
+      builtAt: 'x',
+      carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [
+        { itemId: 'a', name: 'A', productId: '1', qty: 2 },
+        { itemId: 'b', name: 'B', productId: '2', qty: 1, addedQty: 1 },
+      ] }],
+    });
+
+    const res = await grocery.applyObservedCart('walmart', [{ productId: '1' }, { productId: '999' }]);
+    expect(res).toMatchObject({ ok: true, inCart: 1, unknown: ['999'] });
+
+    const lines = readJson('carts.json').carts[0].items;
+    expect(lines.find((l: any) => l.itemId === 'a').addedQty).toBe(2); // observed → in cart
+    expect(lines.find((l: any) => l.itemId === 'b').addedQty).toBeUndefined(); // absent → cleared
+  });
+
+  it('returns ok:false when the retailer cart is missing', async () => {
+    writeJson('carts.json', { builtAt: 'x', carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [] }] });
+    expect((await grocery.applyObservedCart('amazon', [{ productId: '1' }])).ok).toBe(false);
+  });
+});
+
 describe('defaultQty', () => {
   it('overrides the parsed free-form quantity at build time', async () => {
     writeJson('grocery.json', { lastUpdated: '', items: [item('m', 'Milk', { quantity: '1 lb', defaultQty: 3 })] });

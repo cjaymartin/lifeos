@@ -663,12 +663,17 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
       };
     }, () => groceryClient.setCartAdded(retailer, false)), [mutate]);
 
-  /** Open the post-handoff reconciliation panel for a retailer cart, with every
-   *  matched line pre-checked (the user unchecks anything that didn't land). */
+  /** Open the post-handoff reconciliation panel for a retailer cart. If we
+   *  already know what's in the cart (a bookmarklet/extension observation or a
+   *  prior reconcile set addedQty on some line), pre-check exactly those;
+   *  otherwise assume everything landed (the user unchecks the misses). */
   const openReconcile = useCallback((retailer: Retailer) => {
     const cart = state.carts?.carts.find(c => c.retailer === retailer);
     if (!cart) return;
-    setReconcileChecked(new Set(cart.items.filter(m => m.productId).map(m => m.itemId)));
+    const lines = cart.items.filter(m => m.productId && m.status !== 'out_of_stock');
+    const anyAdded = lines.some(m => (m.addedQty ?? 0) >= (m.qty ?? 1));
+    const preset = anyAdded ? lines.filter(m => (m.addedQty ?? 0) >= (m.qty ?? 1)) : lines;
+    setReconcileChecked(new Set(preset.map(m => m.itemId)));
     setReconcile(retailer);
   }, [state.carts]);
 
@@ -1056,7 +1061,7 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                       Which items made it into your {cart.label || RETAILER_LABELS[cart.retailer]} cart? Uncheck anything that didn’t.
                     </p>
                     <ul className="space-y-1">
-                      {cart.items.filter(m => m.productId).map(m => {
+                      {cart.items.filter(m => m.productId && m.status !== 'out_of_stock').map(m => {
                         const on = reconcileChecked.has(m.itemId);
                         return (
                           <li key={m.itemId}>
