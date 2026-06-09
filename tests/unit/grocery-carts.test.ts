@@ -122,6 +122,49 @@ describe('assembleCarts', () => {
   });
 });
 
+describe('reconcileCartAdds', () => {
+  const cartWith = (items: any[]) => ({
+    builtAt: 'x',
+    carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items }],
+  });
+
+  it('sets addedQty on confirmed lines and clears the rest', async () => {
+    writeJson('carts.json', cartWith([
+      { itemId: 'a', name: 'A', productId: '1', qty: 2 },
+      { itemId: 'b', name: 'B', productId: '2', qty: 1 },
+      { itemId: 'c', name: 'C', productId: '3', qty: 1, addedQty: 1 },
+    ]));
+
+    const res = await grocery.reconcileCartAdds('walmart', ['a']);
+    expect(res).toMatchObject({ ok: true, inCart: 1 });
+
+    const lines = readJson('carts.json').carts[0].items;
+    expect(lines.find((l: any) => l.itemId === 'a').addedQty).toBe(2); // confirmed → qty
+    expect(lines.find((l: any) => l.itemId === 'b').addedQty).toBeUndefined();
+    expect(lines.find((l: any) => l.itemId === 'c').addedQty).toBeUndefined(); // previously added, now unconfirmed
+  });
+
+  it('a reconciled line is then excluded from a fresh build (no duplicate re-add)', async () => {
+    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeJson('product-map.json', {
+      milk: { retailer: 'walmart', productId: '111', productUrl: 'u', product: 'p' },
+    });
+    // First build resolves the line instantly
+    await grocery.assembleCarts();
+    // User confirms it landed in the real cart
+    await grocery.reconcileCartAdds('walmart', ['milk-1']);
+    // A subsequent build must not re-add it
+    const again = await grocery.assembleCarts();
+    expect(again).toMatchObject({ instant: 0, queued: 0 });
+  });
+
+  it('returns ok:false when the retailer cart does not exist', async () => {
+    writeJson('carts.json', cartWith([{ itemId: 'a', name: 'A', productId: '1', qty: 1 }]));
+    const res = await grocery.reconcileCartAdds('amazon', ['a']);
+    expect(res.ok).toBe(false);
+  });
+});
+
 describe('loadCarts', () => {
   it('normalizes agent-written carts that omit items/unmatched arrays', async () => {
     // The /build-carts agent writes carts.json directly and may leave out

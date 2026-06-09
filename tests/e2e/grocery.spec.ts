@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readSandboxJson } from './helpers';
+import { readSandboxJson, writeSandboxJson } from './helpers';
 
 test.describe('grocery stack', () => {
   test('renders the list from grocery.json', async ({ page }) => {
@@ -51,5 +51,45 @@ test.describe('grocery stack', () => {
   test('staples section is reachable', async ({ page }) => {
     await page.goto('/grocery');
     await expect(page.getByText(/staples/i).first()).toBeVisible();
+  });
+
+  test('cart reconciliation records which lines actually landed', async ({ page }) => {
+    // Seed a built cart with both lines marked added, so the card offers "Edit"
+    // (the reconcile panel) without any external add-to-cart navigation.
+    writeSandboxJson('src/content/grocery/carts.json', {
+      builtAt: '2026-06-09T00:00:00.000Z',
+      carts: [{
+        retailer: 'walmart',
+        label: 'Walmart',
+        unmatched: [],
+        items: [
+          { itemId: 'recon-a', name: 'Recon Apples', product: 'Apples', price: '$3.00', productId: 'A1', qty: 1, addedQty: 1, confidence: 'high', source: 'reorder' },
+          { itemId: 'recon-b', name: 'Recon Bananas', product: 'Bananas', price: '$2.00', productId: 'B2', qty: 1, addedQty: 1, confidence: 'high', source: 'reorder' },
+        ],
+      }],
+    });
+
+    await page.goto('/grocery');
+    await expect(page.getByText('Built carts')).toBeVisible();
+    // Estimated total sums the matched line prices
+    await expect(page.getByText(/Est\. \$5\.00 · before tax/i)).toBeVisible();
+
+    // Open reconcile, uncheck the bananas (didn't land), confirm
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.getByText(/Which items made it into your Walmart cart/i)).toBeVisible();
+    await page.getByRole('button', { name: 'Recon Bananas', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm cart' }).click();
+
+    // Apples stay in-cart (addedQty=1); bananas reset to pending (cleared)
+    await expect
+      .poll(() => {
+        const c = readSandboxJson<{ carts: any[] }>('src/content/grocery/carts.json');
+        const items = c.carts[0].items;
+        return [
+          items.find((i) => i.itemId === 'recon-a')?.addedQty ?? null,
+          items.find((i) => i.itemId === 'recon-b')?.addedQty ?? null,
+        ];
+      })
+      .toEqual([1, null]);
   });
 });

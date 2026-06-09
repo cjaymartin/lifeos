@@ -298,6 +298,32 @@ export async function assembleCarts(itemIds?: string[]): Promise<CartAssembly> {
   return { instant, queued: agentItems.length, agentItemIds: agentItems.map(i => i.id) };
 }
 
+/* ── Reconcile what actually landed in the retailer cart ───────────────────
+   We can't read the user's real cart (hard rule: no login), so after the
+   add-to-cart handoff the user tells us which lines made it. `addedItemIds`
+   is the authoritative set of lines now in the retailer cart: each gets
+   addedQty = qty (so a later build excludes it → no duplicate re-adds); every
+   other matched line in that cart is cleared back to pending. Replaces the old
+   blanket all-or-nothing mark-added with per-line truth. */
+export async function reconcileCartAdds(
+  retailer: Retailer,
+  addedItemIds: string[],
+): Promise<{ ok: boolean; inCart: number }> {
+  const carts = await loadCarts();
+  const cart = carts?.carts.find(c => c.retailer === retailer);
+  if (!carts || !cart) return { ok: false, inCart: 0 };
+
+  const added = new Set(addedItemIds.map(String));
+  let inCart = 0;
+  for (const m of cart.items) {
+    if (!m.productId) continue;
+    if (added.has(m.itemId)) { m.addedQty = m.qty ?? 1; inCart++; }
+    else delete m.addedQty;
+  }
+  await saveCarts(carts);
+  return { ok: true, inCart };
+}
+
 /* ── Checkout ──────────────────────────────────────────────────────────────
    Remove purchased items from the list, restock matching staples, and log
    to purchases.json. Used by the cart "I checked out" buttons and the

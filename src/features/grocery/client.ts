@@ -37,6 +37,13 @@ export const groceryClient = {
       method: 'POST',
       body: { retailer, action: added ? 'mark-added' : 'reset-added' },
     }),
+  /** Per-line reconciliation: the itemIds that actually landed in the retailer
+   *  cart (the rest are reset to pending). */
+  reconcileCart: (retailer: Retailer, addedItemIds: string[]) =>
+    apiCall<{ ok: boolean; inCart: number }>('/api/grocery/carts', {
+      method: 'POST',
+      body: { retailer, addedItemIds },
+    }),
 
   /* checkout */
   checkout: (body: { retailer?: Retailer; itemIds?: string[] }) =>

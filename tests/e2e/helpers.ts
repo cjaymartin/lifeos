@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -12,4 +12,9 @@ export function sandboxPath(...parts: string[]): string {
 /** Read a JSON file from the sandboxed content store. */
 export function readSandboxJson<T = any>(relative: string): T {
   return JSON.parse(readFileSync(sandboxPath(relative), 'utf-8'));
+}
+
+/** Seed/overwrite a JSON file in the sandboxed content store. */
+export function writeSandboxJson(relative: string, data: unknown): void {
+  writeFileSync(sandboxPath(relative), JSON.stringify(data, null, 2));
 }

@@ -36,6 +36,12 @@ const CONFIDENCE_STYLE: Record<string, string> = {
   low: 'text-destructive',
 };
 
+/** Pull a number out of a display price like "$12.48" (null if none). */
+function parsePrice(s?: string): number | null {
+  const m = s?.match(/(\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
 function loadCollapsed(key: string = COLLAPSE_KEY): Record<string, boolean> {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}'); } catch { return {}; }
 }
@@ -302,6 +308,11 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [buildModal, setBuildModal] = useState(false);
+  // Post-handoff reconciliation: which retailer's cart we're confirming, and
+  // the set of lines the user says actually landed (pre-checked, they uncheck
+  // the misses).
+  const [reconcile, setReconcile] = useState<Retailer | null>(null);
+  const [reconcileChecked, setReconcileChecked] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<BuildProgress | null>(null);
   const [instantCount, setInstantCount] = useState(0);
   const [buildElapsed, setBuildElapsed] = useState(0);
@@ -594,12 +605,46 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
       return { ...s, carts: carts.length ? { ...s.carts, carts } : null };
     }, () => groceryClient.dismissCart(retailer)), [mutate]);
 
-  /** Record (or forget) that the pending lines were pushed to the retailer
-   *  cart. NOTE: callers must NOT run this synchronously from the add-link's
-   *  onClick — the state update replaces the <a> mid-click and some browsers
-   *  cancel the navigation, so nothing gets added. Defer it instead. */
-  const setCartAdded = useCallback((retailer: Retailer, added: boolean) =>
+  /** Forget the whole cart's added-state (the add didn't go through at all —
+   *  bot check, login wall, emptied cart) so the full add is offered again. */
+  const resetCartAdded = useCallback((retailer: Retailer) =>
     mutate(s => {
+      if (!s.carts) return s;
+      return {
+        ...s,
+        carts: {
+          ...s.carts,
+          carts: s.carts.carts.map(c => c.retailer === retailer
+            ? { ...c, items: c.items.map(m => m.productId ? { ...m, addedQty: undefined } : m) }
+            : c),
+        },
+      };
+    }, () => groceryClient.setCartAdded(retailer, false)), [mutate]);
+
+  /** Open the post-handoff reconciliation panel for a retailer cart, with every
+   *  matched line pre-checked (the user unchecks anything that didn't land). */
+  const openReconcile = useCallback((retailer: Retailer) => {
+    const cart = state.carts?.carts.find(c => c.retailer === retailer);
+    if (!cart) return;
+    setReconcileChecked(new Set(cart.items.filter(m => m.productId).map(m => m.itemId)));
+    setReconcile(retailer);
+  }, [state.carts]);
+
+  const toggleReconcile = useCallback((itemId: string) => {
+    setReconcileChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+      return next;
+    });
+  }, []);
+
+  /** Commit the reconciliation: confirmed lines get addedQty=qty (excluded from
+   *  the next build → no duplicate re-adds); the rest reset to pending. */
+  const submitReconcile = useCallback(async (retailer: Retailer) => {
+    const ids = [...reconcileChecked];
+    setReconcile(null);
+    const added = new Set(ids);
+    await mutate(s => {
       if (!s.carts) return s;
       return {
         ...s,
@@ -609,13 +654,14 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
             ? {
                 ...c,
                 items: c.items.map(m => m.productId
-                  ? (added ? { ...m, addedQty: m.qty ?? 1 } : { ...m, addedQty: undefined })
+                  ? (added.has(m.itemId) ? { ...m, addedQty: m.qty ?? 1 } : { ...m, addedQty: undefined })
                   : m),
               }
             : c),
         },
       };
-    }, () => groceryClient.setCartAdded(retailer, added)), [mutate]);
+    }, () => groceryClient.reconcileCart(retailer, ids));
+  }, [reconcileChecked, mutate]);
 
   const checkoutCart = useCallback((retailer: Retailer) =>
     mutate(s => s, () => groceryClient.checkout({ retailer }), { sync: 'always' }), [mutate]);
@@ -790,7 +836,7 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
           </button>
           <button
             onClick={() => startBuild()}
-            disabled={selecting || buildableCount === 0}
+            disabled={selecting || buildState === 'loading' || buildableCount === 0}
             title="Build a Walmart cart for everything on the list not already in a cart (reorders your usual products; never purchases)"
             className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors disabled:opacity-50 ${jobColors(buildState)}`}>
             {buildState === 'loading' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
@@ -859,6 +905,11 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                 cart.retailer,
                 pending.map(m => ({ productId: m.productId, qty: (m.qty ?? 1) - (m.addedQty ?? 0) })),
               );
+              // Estimated cart total from the matched lines' prices
+              const matched = cart.items.filter(m => m.productId);
+              const estTotal = matched.reduce((sum, m) => sum + (parsePrice(m.price) ?? 0), 0);
+              const unpriced = matched.filter(m => parsePrice(m.price) === null).length;
+              const reconciling = reconcile === cart.retailer;
               return (
               <div key={cart.retailer} className="rounded-xl border border-border bg-card p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -915,43 +966,99 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                   ))}
                 </ul>
                 {cart.unmatched.length > 0 && (
-                  <p className="text-xs text-muted-foreground/70">
-                    Not found: {cart.unmatched.join(', ')}
+                  <p className="text-xs text-warning">
+                    <AlertCircle className="inline w-3 h-3 mr-1 align-text-top" />
+                    Needs attention — not found: {cart.unmatched.join(', ')}
                   </p>
                 )}
                 {cart.notes && <p className="text-xs text-muted-foreground/70 italic">{cart.notes}</p>}
-                <div className="flex items-center gap-2 pt-1">
-                  {pending.length > 0 && addUrl ? (
-                    <a href={addUrl} target="_blank" rel="noopener noreferrer"
-                       // Deferred: mutating state in the click handler swaps the
-                       // anchor mid-click and the browser may cancel navigation
-                       onClick={() => setTimeout(() => setCartAdded(cart.retailer, true), 300)}
-                       title={`Adds ${pending.length} item${pending.length === 1 ? '' : 's'} to your ${cart.label || RETAILER_LABELS[cart.retailer]} cart — already-added items are skipped`}
-                       className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
-                      <ShoppingCart className="w-3.5 h-3.5" /> Add to cart ({pending.length})
-                    </a>
-                  ) : (
-                    <>
-                      <a href={RETAILER_CART_URLS[cart.retailer]} target="_blank" rel="noopener noreferrer"
-                         title="Everything's already in the retailer cart — this just opens it (adds nothing)"
-                         className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors">
-                        <ExternalLink className="w-3.5 h-3.5" /> View cart
-                      </a>
+                {matched.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground/70">
+                    {unpriced > 0 ? '≥ ' : 'Est. '}${estTotal.toFixed(2)} · before tax &amp; fees
+                    {unpriced > 0 && ` · ${unpriced} unpriced`}
+                  </p>
+                )}
+
+                {reconciling ? (
+                  /* Post-handoff reconciliation — the honest "what landed" step */
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+                    <p className="text-[11px] font-medium text-foreground">
+                      Which items made it into your {cart.label || RETAILER_LABELS[cart.retailer]} cart? Uncheck anything that didn’t.
+                    </p>
+                    <ul className="space-y-1">
+                      {cart.items.filter(m => m.productId).map(m => {
+                        const on = reconcileChecked.has(m.itemId);
+                        return (
+                          <li key={m.itemId}>
+                            <button
+                              onClick={() => toggleReconcile(m.itemId)}
+                              className="flex items-center gap-2 w-full text-left text-xs">
+                              <span className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                                on ? 'bg-primary border-primary text-primary-foreground' : 'border-border'
+                              }`}>
+                                {on && <Check className="w-3 h-3" />}
+                              </span>
+                              <span className={on ? 'text-foreground' : 'text-muted-foreground line-through'}>{m.name}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setCartAdded(cart.retailer, false)}
-                        title="Didn't actually make it into the cart? Reset so you can add again"
-                        className="text-xs px-2 py-1.5 rounded-md text-muted-foreground/60 hover:text-foreground transition-colors">
-                        Re-add
+                        onClick={() => submitReconcile(cart.retailer)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+                        Confirm cart
                       </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => checkoutCart(cart.retailer)}
-                    title="Mark these items purchased — removes them from the list and restocks staples"
-                    className="text-xs px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors">
-                    I checked out
-                  </button>
-                </div>
+                      <button
+                        onClick={() => setReconcile(null)}
+                        className="text-xs px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 pt-1">
+                    {pending.length > 0 && addUrl ? (
+                      <a href={addUrl} target="_blank" rel="noopener noreferrer"
+                         // Opens the bulk add link in a new tab; the reconcile panel
+                         // (opened here) is how we learn what actually landed. No
+                         // deferral needed — addedQty changes only on confirm, so the
+                         // anchor isn't swapped mid-click.
+                         onClick={() => openReconcile(cart.retailer)}
+                         title={`Adds ${pending.length} item${pending.length === 1 ? '' : 's'} to your ${cart.label || RETAILER_LABELS[cart.retailer]} cart, then asks which ones landed`}
+                         className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+                        <ShoppingCart className="w-3.5 h-3.5" /> Add to cart ({pending.length})
+                      </a>
+                    ) : (
+                      <>
+                        <a href={RETAILER_CART_URLS[cart.retailer]} target="_blank" rel="noopener noreferrer"
+                           title="Everything's already in the retailer cart — this just opens it (adds nothing)"
+                           className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors">
+                          <ExternalLink className="w-3.5 h-3.5" /> View cart
+                        </a>
+                        <button
+                          onClick={() => openReconcile(cart.retailer)}
+                          title="Fix what's actually in the cart"
+                          className="text-xs px-2 py-1.5 rounded-md text-muted-foreground/60 hover:text-foreground transition-colors">
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => resetCartAdded(cart.retailer)}
+                          title="Didn't actually make it into the cart? Reset so you can add again"
+                          className="text-xs px-2 py-1.5 rounded-md text-muted-foreground/60 hover:text-foreground transition-colors">
+                          Re-add
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => checkoutCart(cart.retailer)}
+                      title="Mark these items purchased — removes them from the list and restocks staples"
+                      className="text-xs px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors">
+                      I checked out
+                    </button>
+                  </div>
+                )}
               </div>
               );
             })}
