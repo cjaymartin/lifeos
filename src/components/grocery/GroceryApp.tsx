@@ -48,7 +48,7 @@ function loadCollapsed(key: string = COLLAPSE_KEY): Record<string, boolean> {
 
 /** Per-item settings cog: rename, always-buy-from, restock policy (staples),
  *  and the pinned-product link. */
-function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, restockAt, onRestockAt, onRename }: {
+function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, restockAt, onRestockAt, onRename, defaultQty, onDefaultQty }: {
   name: string;
   pin?: ProductRef;
   onSavePin: (name: string, url: string) => Promise<string | null>;
@@ -59,13 +59,23 @@ function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, re
   restockAt?: RestockAt;
   onRestockAt?: (r: RestockAt) => void;
   onRename: (newName: string) => void;
+  /** Preferred purchase count; null clears it */
+  defaultQty?: number;
+  onDefaultQty: (n: number | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [rename, setRename] = useState(name);
+  const [qty, setQty] = useState(defaultQty ? String(defaultQty) : '');
 
-  const active = !!pin || !!buyFrom || (restockAt !== undefined && restockAt !== 'low');
+  const active = !!pin || !!buyFrom || (restockAt !== undefined && restockAt !== 'low') || !!defaultQty;
+
+  const commitQty = () => {
+    const n = parseInt(qty.trim(), 10);
+    if (qty.trim() === '') { if (defaultQty) onDefaultQty(null); return; }
+    if (Number.isFinite(n) && n >= 1 && n !== defaultQty) onDefaultQty(n);
+  };
 
   const savePin = async () => {
     if (!url.trim()) return;
@@ -91,7 +101,7 @@ function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, re
   return (
     <span className="relative">
       <button
-        onClick={() => { setOpen(o => !o); setUrl(''); setError(null); setRename(name); }}
+        onClick={() => { setOpen(o => !o); setUrl(''); setError(null); setRename(name); setQty(defaultQty ? String(defaultQty) : ''); }}
         title={`Settings for ${name}${pin ? ` — pinned: ${pin.product ?? pin.productId}` : ''}${buyFrom ? ` — buys from ${RETAILER_LABELS[buyFrom]}` : ''}`}
         aria-label={`Settings for ${name}`}
         className={`p-1 rounded transition-colors ${
@@ -129,6 +139,24 @@ function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, re
               {chip(buyFrom === 'walmart', 'Walmart', () => onBuyFrom(buyFrom === 'walmart' ? null : 'walmart'))}
               {chip(buyFrom === 'amazon', 'Amazon', () => onBuyFrom(buyFrom === 'amazon' ? null : 'amazon'))}
               {chip(!buyFrom, 'Anywhere', () => onBuyFrom(null))}
+            </span>
+          </span>
+
+          {/* Default quantity */}
+          <span className="block space-y-1">
+            <span className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Always buy</span>
+            <span className="flex items-center gap-1.5">
+              <input
+                type="number" min="1" inputMode="numeric"
+                value={qty}
+                onChange={e => setQty(e.target.value)}
+                onBlur={commitQty}
+                onKeyDown={e => { if (e.key === 'Enter') commitQty(); if (e.key === 'Escape') setOpen(false); }}
+                placeholder="—"
+                aria-label={`Default quantity for ${name}`}
+                className="w-16 bg-transparent border border-border rounded-md px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30"
+              />
+              <span className="text-[11px] text-muted-foreground">per cart{defaultQty ? '' : ' (defaults to 1)'}</span>
             </span>
           </span>
 
@@ -198,7 +226,7 @@ function InCartBadge({ retailer }: { retailer: string }) {
   );
 }
 
-function ItemRow({ item, onToggle, onStar, onDelete, productRef, onPinSave, onPinClear, onRename, onBuyFrom, selecting, selected, onSelect, inCart }: {
+function ItemRow({ item, onToggle, onStar, onDelete, productRef, onPinSave, onPinClear, onRename, onBuyFrom, onDefaultQty, selecting, selected, onSelect, inCart }: {
   item: GroceryItem;
   onToggle: (item: GroceryItem) => void;
   onStar: (item: GroceryItem) => void;
@@ -208,6 +236,7 @@ function ItemRow({ item, onToggle, onStar, onDelete, productRef, onPinSave, onPi
   onPinClear: (name: string) => void;
   onRename: (item: GroceryItem, name: string) => void;
   onBuyFrom: (item: GroceryItem, retailer: Retailer | null) => void;
+  onDefaultQty: (item: GroceryItem, n: number | null) => void;
   selecting: boolean;
   selected: boolean;
   onSelect: (item: GroceryItem) => void;
@@ -271,6 +300,7 @@ function ItemRow({ item, onToggle, onStar, onDelete, productRef, onPinSave, onPi
         name={item.name} pin={productRef}
         onSavePin={onPinSave} onClearPin={onPinClear}
         buyFrom={item.buyFrom} onBuyFrom={r => onBuyFrom(item, r)}
+        defaultQty={item.defaultQty} onDefaultQty={n => onDefaultQty(item, n)}
         onRename={n => onRename(item, n)} />
       <button
         onClick={() => onStar(item)}
@@ -426,6 +456,13 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
       s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, buyFrom: retailer ?? undefined } : i) }),
       () => groceryClient.patchItem(item.id, { buyFrom: retailer }),
       { sync: 'always' },
+    ), [mutate]);
+
+  const setItemDefaultQty = useCallback((item: GroceryItem, n: number | null) =>
+    mutate(
+      s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, defaultQty: n ?? undefined } : i) }),
+      () => groceryClient.patchItem(item.id, { defaultQty: n }),
+      { sync: 'always' }, // mirrors onto a matching staple server-side
     ), [mutate]);
 
   /** Generic staple PATCH + refetch (rename, buyFrom, restockAt). */
@@ -1101,7 +1138,7 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                            onToggle={handleToggle} onStar={handleStar} onDelete={handleDelete}
                            productRef={state.productMap?.[normalizeName(item.name)]}
                            onPinSave={pinSave} onPinClear={pinClear}
-                           onRename={renameItem} onBuyFrom={setItemBuyFrom}
+                           onRename={renameItem} onBuyFrom={setItemBuyFrom} onDefaultQty={setItemDefaultQty}
                            selecting={selecting} selected={selected.has(item.id)} onSelect={toggleSelected}
                            inCart={inCartById[item.id]} />
                 ))}
@@ -1233,6 +1270,7 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                             name={staple.name} pin={state.productMap?.[normalizeName(staple.name)]}
                             onSavePin={pinSave} onClearPin={pinClear}
                             buyFrom={staple.buyFrom} onBuyFrom={r => patchStaple(staple.id, { buyFrom: r })}
+                            defaultQty={staple.defaultQty} onDefaultQty={n => patchStaple(staple.id, { defaultQty: n })}
                             restockAt={staple.restockAt ?? 'low'} onRestockAt={r => patchStaple(staple.id, { restockAt: r })}
                             onRename={n => patchStaple(staple.id, { name: n })} />
                           <button

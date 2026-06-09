@@ -165,6 +165,50 @@ describe('reconcileCartAdds', () => {
   });
 });
 
+describe('defaultQty', () => {
+  it('overrides the parsed free-form quantity at build time', async () => {
+    writeJson('grocery.json', { lastUpdated: '', items: [item('m', 'Milk', { quantity: '1 lb', defaultQty: 3 })] });
+    writeJson('product-map.json', { milk: { retailer: 'walmart', productId: '1', productUrl: 'u', product: 'p' } });
+    await grocery.assembleCarts();
+    expect(readJson('carts.json').carts[0].items[0].qty).toBe(3);
+  });
+});
+
+describe('learnProduct', () => {
+  it('writes a learned (unpinned) entry but never overwrites a pin', () => {
+    const map: any = { milk: { retailer: 'walmart', productId: 'PINNED', pinned: true } };
+    expect(grocery.learnProduct(map, 'Milk', { retailer: 'walmart', productId: 'NEW' })).toBe(false);
+    expect(map.milk.productId).toBe('PINNED');
+    expect(grocery.learnProduct(map, 'Bread', { retailer: 'walmart', productId: 'B1', product: 'Loaf' })).toBe(true);
+    expect(map.bread).toMatchObject({ productId: 'B1', pinned: false });
+  });
+});
+
+describe('checkoutItems — confirmed-purchase learning', () => {
+  it('learns the exact product from the built cart line', async () => {
+    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeJson('carts.json', {
+      builtAt: 'x',
+      carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [],
+        items: [{ itemId: 'milk-1', name: 'Milk', productId: '555', product: 'GV Milk', productUrl: 'u', qty: 1 }] }],
+    });
+    await grocery.checkoutItems(['milk-1'], 'walmart');
+    expect(readJson('product-map.json').milk).toMatchObject({ productId: '555', pinned: false });
+  });
+
+  it('does not overwrite a pinned product on checkout', async () => {
+    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeJson('product-map.json', { milk: { retailer: 'walmart', productId: 'PINNED', pinned: true } });
+    writeJson('carts.json', {
+      builtAt: 'x',
+      carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [],
+        items: [{ itemId: 'milk-1', name: 'Milk', productId: '555', qty: 1 }] }],
+    });
+    await grocery.checkoutItems(['milk-1'], 'walmart');
+    expect(readJson('product-map.json').milk.productId).toBe('PINNED');
+  });
+});
+
 describe('loadCarts', () => {
   it('normalizes agent-written carts that omit items/unmatched arrays', async () => {
     // The /build-carts agent writes carts.json directly and may leave out

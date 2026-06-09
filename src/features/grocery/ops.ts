@@ -212,6 +212,28 @@ function countQty(quantity?: string): number {
   return quantity && /^\d+$/.test(quantity.trim()) ? Math.max(1, parseInt(quantity, 10)) : 1;
 }
 
+/** Purchase count for a build: an explicit defaultQty wins over the parsed
+ *  free-form quantity ("I always buy 2 of these"). */
+function buildQty(item: GroceryItem): number {
+  return item.defaultQty && item.defaultQty > 0 ? Math.floor(item.defaultQty) : countQty(item.quantity);
+}
+
+/** Merge a learned product into the map under an item name, NEVER clobbering a
+ *  user pin (pinned entries are authoritative). Returns whether it wrote. */
+export function learnProduct(
+  map: Record<string, ProductRef>,
+  name: string,
+  ref: { retailer: Retailer; productId: string; product?: string; productUrl?: string },
+): boolean {
+  const key = normalizeName(name);
+  if (map[key]?.pinned) return false;
+  map[key] = {
+    retailer: ref.retailer, productId: ref.productId,
+    product: ref.product, productUrl: ref.productUrl, pinned: false,
+  };
+  return true;
+}
+
 export interface CartAssembly {
   /** Lines resolved instantly from the product memory (no agent). */
   instant: number;
@@ -271,7 +293,7 @@ export async function assembleCarts(itemIds?: string[]): Promise<CartAssembly> {
       product: ref.product,
       productUrl: ref.productUrl,
       productId: ref.productId,
-      qty: countQty(item.quantity),
+      qty: buildQty(item),
       confidence: 'high',
       source: 'reorder',
     };
@@ -350,6 +372,25 @@ export async function checkoutItems(
     }
   }
 
+  // Learn the exact product just bought (from the built cart line) so the next
+  // reorder locks onto it instead of re-guessing — never overwriting a pin.
+  const carts = await loadCarts();
+  if (carts) {
+    const lineByItem = new Map<string, { retailer: Retailer; productId: string; product?: string; productUrl?: string }>();
+    for (const c of carts.carts)
+      for (const m of c.items)
+        if (m.productId) lineByItem.set(m.itemId, { retailer: c.retailer, productId: m.productId, product: m.product, productUrl: m.productUrl });
+    let map: Record<string, ProductRef> | null = null;
+    let mapDirty = false;
+    for (const item of removed) {
+      const line = lineByItem.get(item.id);
+      if (!line) continue;
+      if (!map) map = await loadProductMap();
+      if (learnProduct(map, item.name, line)) mapDirty = true;
+    }
+    if (mapDirty && map) await saveProductMap(map);
+  }
+
   await saveGrocery(grocery);
   if (staplesDirty) await saveStaples(staples);
   await appendPurchases(removed.map(i => ({
@@ -388,6 +429,7 @@ export async function syncStapleToList(staple: Staple, grocery: GroceryData): Pr
       source: 'staple',
       note: staple.status === 'low' ? 'running low' : undefined,
       buyFrom: staple.buyFrom,
+      defaultQty: staple.defaultQty,
     } satisfies GroceryItem);
     return true;
   }

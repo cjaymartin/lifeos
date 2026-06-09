@@ -26,6 +26,8 @@ export interface GroceryItem {
   source: ItemSource;
   /** Cart builds must match this item at this retailer only */
   buyFrom?: Retailer;
+  /** Preferred purchase count — overrides the parsed quantity at build time */
+  defaultQty?: number;
 }
 
 export interface GroceryData {
@@ -44,6 +46,8 @@ export interface Staple {
   restockAt?: RestockAt;
   /** Cart builds must match this staple's items at this retailer only */
   buyFrom?: Retailer;
+  /** Preferred purchase count — carried onto the list item when auto-re-added */
+  defaultQty?: number;
 }
 
 export interface CartMatch {
