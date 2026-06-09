@@ -91,6 +91,8 @@ export interface PurchaseRecord {
   quantity?: string;
   source: Retailer | 'in-store' | 'scan';
   orderId?: string;
+  /** Set when a later "item unavailable / refunded" email reverses this buy */
+  refunded?: boolean;
 }
 
 /** A specific retailer product pinned to (or learned for) an item name */

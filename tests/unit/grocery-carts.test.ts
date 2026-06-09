@@ -209,6 +209,38 @@ describe('checkoutItems — confirmed-purchase learning', () => {
   });
 });
 
+describe('loadGroceryState — unavailable/refunded scan', () => {
+  it('re-adds an unavailable item, refunds its purchase, and resets the staple', async () => {
+    writeJson('grocery.json', { lastUpdated: '', items: [] });
+    writeJson('staples.json', { staples: [{ id: 'bb', name: 'blackberries', category: 'Produce', status: 'stocked', lastPurchased: '2026-06-04' }] });
+    writeJson('purchases.json', { purchases: [{ date: '2026-06-04', name: 'blackberries', source: 'walmart', orderId: 'O1' }] });
+    writeJson('.scan-results.json', { unavailable: [{ name: 'blackberries', orderId: 'O1', date: '2026-06-04' }] });
+
+    const state = await grocery.loadGroceryState();
+    expect(state.items.some(i => i.name === 'blackberries' && i.source === 'scan')).toBe(true);
+    expect(readJson('purchases.json').purchases[0].refunded).toBe(true);
+    const s = readJson('staples.json').staples[0];
+    expect(s.status).toBe('out');
+    expect(s.lastPurchased).toBeUndefined();
+    expect(existsSync(join(DIR, '.scan-results.json'))).toBe(false);
+  });
+
+  it('a buy then refund in the same scan nets the item back on the list', async () => {
+    writeJson('grocery.json', { lastUpdated: '', items: [item('m', 'Milk')] });
+    writeJson('staples.json', { staples: [] });
+    writeJson('purchases.json', { purchases: [] });
+    writeJson('.scan-results.json', {
+      purchases: [{ name: 'Milk', retailer: 'walmart', orderId: 'O2', date: '2026-06-05', matchedItemIds: ['m'] }],
+      unavailable: [{ name: 'Milk', orderId: 'O2', date: '2026-06-05' }],
+    });
+
+    const state = await grocery.loadGroceryState();
+    expect(state.items.some(i => i.name.toLowerCase() === 'milk')).toBe(true);
+    const rec = readJson('purchases.json').purchases.find((r: any) => r.orderId === 'O2');
+    expect(rec?.refunded).toBe(true);
+  });
+});
+
 describe('loadCarts', () => {
   it('normalizes agent-written carts that omit items/unmatched arrays', async () => {
     // The /build-carts agent writes carts.json directly and may leave out

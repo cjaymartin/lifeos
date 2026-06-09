@@ -188,7 +188,7 @@ async function migrateStapleCategories(): Promise<void> {
    them here so user edits and agent output never race on the same file. */
 
 interface ScanResults {
-  purchases: {
+  purchases?: {
     name: string;
     retailer: 'walmart' | 'amazon';
     orderId?: string;
@@ -196,6 +196,36 @@ interface ScanResults {
     /** ids from grocery.json the agent matched this purchase to */
     matchedItemIds?: string[];
   }[];
+  /** Items an order email says were unavailable/refunded/not fulfilled */
+  unavailable?: {
+    name: string;
+    orderId?: string;
+    date?: string;
+    matchedItemIds?: string[];
+  }[];
+}
+
+/** Mark purchase-log records refunded (matched by name, and orderId when given).
+ *  Returns the dates of the records it flipped, so a falsely-set staple
+ *  lastPurchased from that same order can be cleared. */
+async function markPurchasesRefunded(items: { name: string; orderId?: string }[]): Promise<Set<string>> {
+  const data = await readJson<{ purchases: PurchaseRecord[] }>(PURCHASES_FILE);
+  const dates = new Set<string>();
+  if (!data?.purchases?.length) return dates;
+  let dirty = false;
+  for (const it of items) {
+    const norm = normalizeName(it.name);
+    for (const rec of data.purchases) {
+      if (rec.refunded) continue;
+      if (normalizeName(rec.name) === norm && (!it.orderId || rec.orderId === it.orderId)) {
+        rec.refunded = true;
+        dates.add(rec.date);
+        dirty = true;
+      }
+    }
+  }
+  if (dirty) await writeJson(PURCHASES_FILE, data);
+  return dates;
 }
 
 export async function loadGroceryState(): Promise<GroceryState> {
@@ -228,12 +258,14 @@ export async function loadGroceryState(): Promise<GroceryState> {
     try { await unlink(CATEGORIZED_FILE); } catch {}
   }
 
-  // 2. Apply Gmail purchase-scan results: remove purchased items, restock staples
+  // 2. Apply Gmail purchase-scan results: confirmed buys remove items + restock
+  //    staples; unavailable/refunded items get re-added so nothing falls through.
   const scan = await readJson<ScanResults>(SCAN_RESULTS_FILE);
-  if (scan?.purchases?.length) {
+  if (scan && (scan.purchases?.length || scan.unavailable?.length)) {
     const today = new Date().toISOString().slice(0, 10);
     const records: PurchaseRecord[] = [];
-    for (const p of scan.purchases) {
+    // 2a. Confirmed purchases (apply first, so a same-scan refund nets correctly)
+    for (const p of scan.purchases ?? []) {
       const ids = new Set(p.matchedItemIds ?? []);
       const matched = grocery.items.filter(i => ids.has(i.id) || normalizeName(i.name) === normalizeName(p.name));
       for (const item of matched) {
@@ -248,7 +280,39 @@ export async function loadGroceryState(): Promise<GroceryState> {
         }
       }
     }
-    await appendPurchases(records);
+    if (records.length) await appendPurchases(records);
+
+    // 2b. Unavailable / refunded items
+    if (scan.unavailable?.length) {
+      const categoryMap = await loadCategoryMap();
+      const refundDates = await markPurchasesRefunded(
+        scan.unavailable.map(u => ({ name: u.name, orderId: u.orderId })),
+      );
+      for (const u of scan.unavailable) {
+        const norm = normalizeName(u.name);
+        // Re-add to the list if it isn't already there (unchecked)
+        if (!grocery.items.some(i => normalizeName(i.name) === norm && !i.checked)) {
+          const [cat, confirmed] = resolveCategory(u.name, categoryMap);
+          grocery.items.push({
+            id: makeItemId(u.name), name: u.name, category: cat, categoryConfirmed: confirmed,
+            staple: staples.some(s => normalizeName(s.name) === norm),
+            checked: false, addedAt: new Date().toISOString(), source: 'scan',
+            note: 'Walmart: unavailable — reorder',
+          });
+          groceryDirty = true;
+        }
+        // Staple back to Out; drop a lastPurchased falsely set by this same order
+        const staple = staples.find(s => normalizeName(s.name) === norm);
+        if (staple) {
+          staple.status = 'out';
+          if (staple.lastPurchased && (refundDates.has(staple.lastPurchased) || u.date === staple.lastPurchased)) {
+            staple.lastPurchased = undefined;
+          }
+          staplesDirty = true;
+        }
+      }
+    }
+
     try { await unlink(SCAN_RESULTS_FILE); } catch {}
   }
 
