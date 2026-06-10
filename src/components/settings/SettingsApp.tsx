@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, KeyRound } from 'lucide-react';
 import AccountCard from './AccountCard';
+import ExtensionCard from './ExtensionCard';
 import { cn } from '@/lib/utils';
 import { pollJob, type JobHandle } from '@/lib/client/job-watch';
 import type { SettingsSnapshot } from '@/features/settings/ops/account-info';
 
-// Tab shell — Logins & Sessions is the first of more settings tabs to come
-// (passkeys, widgets, …). Add new entries here as they're built.
-const TABS = [{ id: 'logins', label: 'Logins & Sessions' }] as const;
+// Tab shell — more settings tabs to come (passkeys, widgets, …). Add entries here.
+const TABS = [
+  { id: 'logins', label: 'Logins & Sessions' },
+  { id: 'extension', label: 'Browser Extension' },
+] as const;
+type TabId = (typeof TABS)[number]['id'];
 
 interface Props {
   initial: SettingsSnapshot;
@@ -15,8 +19,15 @@ interface Props {
 
 export default function SettingsApp({ initial }: Props) {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot>(initial);
-  const [tab] = useState<(typeof TABS)[number]['id']>('logins');
+  const [tab, setTab] = useState<TabId>('logins');
   const pollHandle = useRef<JobHandle | null>(null);
+
+  // Allow deep-linking a tab (e.g. the sidebar "Download Extension" →
+  // /settings/logins?tab=extension).
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('tab');
+    if (q && TABS.some((t) => t.id === q)) setTab(q as TabId);
+  }, []);
 
   const refresh = useCallback(async (): Promise<SettingsSnapshot | null> => {
     try {
@@ -73,6 +84,7 @@ export default function SettingsApp({ initial }: Props) {
         {TABS.map((t) => (
           <button
             key={t.id}
+            onClick={() => setTab(t.id)}
             className={cn(
               'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
               tab === t.id
@@ -111,6 +123,12 @@ export default function SettingsApp({ initial }: Props) {
           {snapshot.accounts.map((a) => (
             <AccountCard key={a.id} account={a} onJobStarted={onJobStarted} onChanged={onChanged} />
           ))}
+        </div>
+      )}
+
+      {tab === 'extension' && (
+        <div className="mt-6">
+          <ExtensionCard />
         </div>
       )}
     </div>

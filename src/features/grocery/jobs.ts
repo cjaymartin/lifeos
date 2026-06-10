@@ -26,9 +26,8 @@ export const groceryJobs: Record<GroceryJob, AgentJob> = {
     allowedTools: [
       'WebSearch',
       'WebFetch',
-      // Past Walmart order emails → reorder exact products instead of guessing
-      'mcp__claude_ai_Gmail__search_threads',
-      'mcp__claude_ai_Gmail__get_thread',
+      // No Gmail — cart-building reorders from the product memory (grown by
+      // confirmed purchases + order-history sync), web search as fallback.
       'Read(src/content/grocery/*)',
       'Write(src/content/grocery/carts.json)',
       'Write(src/content/grocery/product-map.json)',

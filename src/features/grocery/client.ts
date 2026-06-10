@@ -25,6 +25,9 @@ export const groceryClient = {
   /* product pins */
   pinProduct: (name: string, url: string) =>
     apiCall('/api/grocery/product-map', { method: 'POST', body: { name, url } }),
+  /** One-click pin of an exact product (from a built cart line). */
+  pinProductById: (name: string, ref: { retailer: Retailer; productId: string; product?: string; productUrl?: string }) =>
+    apiCall('/api/grocery/product-map', { method: 'POST', body: { name, ...ref } }),
   clearPin: (name: string) => apiCall('/api/grocery/product-map', { method: 'DELETE', body: { name } }),
 
   /* carts */
@@ -37,6 +40,27 @@ export const groceryClient = {
       method: 'POST',
       body: { retailer, action: added ? 'mark-added' : 'reset-added' },
     }),
+  /** Per-line reconciliation: the itemIds that actually landed in the retailer
+   *  cart (the rest are reset to pending). */
+  reconcileCart: (retailer: Retailer, addedItemIds: string[]) =>
+    apiCall<{ ok: boolean; inCart: number }>('/api/grocery/carts', {
+      method: 'POST',
+      body: { retailer, addedItemIds },
+    }),
+  /** Ingest the real retailer cart observed in the user's own session
+   *  (bookmarklet/extension) → reconcile per line. */
+  observeCart: (retailer: Retailer, items: { productId: string; qty?: number; product?: string; price?: string }[]) =>
+    apiCall<{ ok: boolean; inCart: number; unknown: string[] }>('/api/grocery/carts/observed', {
+      method: 'POST',
+      body: { retailer, items },
+    }),
+
+  /* out-of-stock substitution */
+  acceptSubstitute: (retailer: Retailer, itemId: string, productId: string) =>
+    apiCall('/api/grocery/substitute', { method: 'POST', body: { retailer, itemId, productId } }),
+  /** Replace a cart line's product from a pasted product URL ("wrong product?"). */
+  changeCartProduct: (retailer: Retailer, itemId: string, url: string) =>
+    apiCall('/api/grocery/carts/change', { method: 'POST', body: { retailer, itemId, url } }),
 
   /* checkout */
   checkout: (body: { retailer?: Retailer; itemIds?: string[] }) =>

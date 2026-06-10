@@ -46,6 +46,26 @@ export function hasSession(cookies: CookieJar): boolean {
   return verifySession(cookies.get(SESSION_COOKIE)?.value, getSessionSecret());
 }
 
+/** Bearer token == the session token. Lets non-browser clients (the grocery
+ *  browser extension, which can't send the httpOnly/SameSite-lax cookie
+ *  cross-site) authenticate with `Authorization: Bearer <token>`. */
+export function verifyBearer(authHeader: string | null, secret: string): boolean {
+  if (!authHeader || !secret) return false;
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  return !!m && m[1].trim() === makeSessionToken(secret);
+}
+
+/**
+ * Route guard accepting EITHER a valid session cookie OR a bearer token equal
+ * to the session token. For ingest endpoints the extension posts to.
+ */
+export function requireSessionOrToken(cookies: CookieJar, request: Request): Response | null {
+  const secret = getSessionSecret();
+  if (verifySession(cookies.get(SESSION_COOKIE)?.value, secret)) return null;
+  if (verifyBearer(request.headers.get('authorization'), secret)) return null;
+  return new Response('Unauthorized', { status: 401 });
+}
+
 export function setSession(cookies: { set: Function }, secret: string) {
   cookies.set(SESSION_COOKIE, makeSessionToken(secret), {
     httpOnly: true,

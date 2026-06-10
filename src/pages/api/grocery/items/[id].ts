@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import {
-  loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, renameInProductMap,
+  loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, renameInProductMap, learnCategory,
 } from '@/features/grocery/ops';
 import { normalizeName, DEFAULT_CATEGORIES } from '@/features/grocery/types';
 import type { Retailer } from '@/features/grocery/types';
@@ -19,8 +19,13 @@ export const PATCH: APIRoute = async ({ cookies, request, params }) => {
   let body: {
     checked?: boolean; name?: string; quantity?: string; note?: string;
     category?: string; staple?: boolean; buyFrom?: Retailer | null;
+    defaultQty?: number | null;
   };
   try { body = await request.json(); } catch {
+    return new Response('Bad request', { status: 400 });
+  }
+  if (body.defaultQty !== undefined && body.defaultQty !== null
+      && !(typeof body.defaultQty === 'number' && body.defaultQty >= 1)) {
     return new Response('Bad request', { status: 400 });
   }
 
@@ -52,10 +57,21 @@ export const PATCH: APIRoute = async ({ cookies, request, params }) => {
     }
   }
   if (typeof body.quantity === 'string') item.quantity = body.quantity.trim() || undefined;
+  if (body.defaultQty !== undefined) {
+    item.defaultQty = body.defaultQty === null ? undefined : Math.floor(body.defaultQty);
+    // Persist the preference on a matching staple so it survives checkout/re-add
+    const staples = await loadStaples();
+    const staple = staples.find(s => normalizeName(s.name) === normalizeName(item.name));
+    if (staple && staple.defaultQty !== item.defaultQty) {
+      staple.defaultQty = item.defaultQty;
+      await saveStaples(staples);
+    }
+  }
   if (typeof body.note === 'string') item.note = body.note.trim() || undefined;
   if (typeof body.category === 'string' && (DEFAULT_CATEGORIES as readonly string[]).includes(body.category)) {
     item.category = body.category;
     item.categoryConfirmed = true; // user said so
+    await learnCategory(item.name, body.category); // and remember it for next time
   }
 
   // Toggling the star keeps staples.json in sync

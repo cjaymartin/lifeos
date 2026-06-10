@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import {
   loadGrocery, saveGrocery, loadStaples, saveStaples, makeItemId, syncStapleToList, renameInProductMap,
+  loadCategoryMap, resolveCategory, learnCategory,
 } from '@/features/grocery/ops';
 import { normalizeName, DEFAULT_CATEGORIES, STAPLE_STATUS_ORDER } from '@/features/grocery/types';
 import type { RestockAt, Retailer, StapleStatus } from '@/features/grocery/types';
@@ -28,10 +29,12 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (staples.some(s => normalizeName(s.name) === normalizeName(name)))
     return json({ ok: true, duplicate: true });
 
-  const cat = category && (DEFAULT_CATEGORIES as readonly string[]).includes(category) ? category : 'Other';
+  const explicit = category && (DEFAULT_CATEGORIES as readonly string[]).includes(category) ? category : null;
+  const [cat] = explicit ? [explicit] : resolveCategory(name, await loadCategoryMap());
   const staple = { id: makeItemId(name), name, category: cat, status: 'stocked' as StapleStatus };
   staples.push(staple);
   await saveStaples(staples);
+  if (explicit) await learnCategory(name, explicit);
 
   // Mark any matching list item as a staple
   const grocery = await loadGrocery();
@@ -52,7 +55,7 @@ export const PATCH: APIRoute = async ({ cookies, request }) => {
   const denied = requireSession(cookies);
   if (denied) return denied;
 
-  let body: { id: string; status?: StapleStatus; category?: string; name?: string; buyFrom?: Retailer | null; restockAt?: RestockAt };
+  let body: { id: string; status?: StapleStatus; category?: string; name?: string; buyFrom?: Retailer | null; restockAt?: RestockAt; defaultQty?: number | null };
   try {
     body = await request.json();
     if (!body.id) throw new Error();
@@ -61,7 +64,8 @@ export const PATCH: APIRoute = async ({ cookies, request }) => {
     if (body.name !== undefined && !String(body.name).trim()) throw new Error();
     if (body.buyFrom !== undefined && body.buyFrom !== null && !['walmart', 'amazon'].includes(body.buyFrom)) throw new Error();
     if (body.restockAt !== undefined && !['low', 'out', 'never'].includes(body.restockAt)) throw new Error();
-    if ([body.status, body.category, body.name, body.buyFrom, body.restockAt].every(v => v === undefined)) throw new Error();
+    if (body.defaultQty !== undefined && body.defaultQty !== null && !(typeof body.defaultQty === 'number' && body.defaultQty >= 1)) throw new Error();
+    if ([body.status, body.category, body.name, body.buyFrom, body.restockAt, body.defaultQty].every(v => v === undefined)) throw new Error();
   } catch {
     return new Response('Bad request', { status: 400 });
   }
@@ -75,11 +79,13 @@ export const PATCH: APIRoute = async ({ cookies, request }) => {
   if (body.category) staple.category = body.category;
   if (body.restockAt) staple.restockAt = body.restockAt;
   if (body.buyFrom !== undefined) staple.buyFrom = body.buyFrom ?? undefined;
+  if (body.defaultQty !== undefined) staple.defaultQty = body.defaultQty === null ? undefined : Math.floor(body.defaultQty);
   if (body.name && body.name.trim() !== oldName) {
     await renameInProductMap(oldName, body.name.trim());
     staple.name = body.name.trim();
   }
   await saveStaples(staples);
+  if (body.category) await learnCategory(staple.name, body.category); // remember the override
 
   const grocery = await loadGrocery();
   let groceryDirty = false;
@@ -94,6 +100,7 @@ export const PATCH: APIRoute = async ({ cookies, request }) => {
       groceryDirty = true;
     }
     if (body.buyFrom !== undefined && item.buyFrom !== staple.buyFrom) { item.buyFrom = staple.buyFrom; groceryDirty = true; }
+    if (body.defaultQty !== undefined && item.defaultQty !== staple.defaultQty) { item.defaultQty = staple.defaultQty; groceryDirty = true; }
   }
   // Status or policy changes can add/remove the auto-added list item
   if (body.status || body.restockAt) {

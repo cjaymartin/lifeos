@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { assembleCarts } from '@/features/grocery/ops';
-import { spawnGroceryJob } from '@/features/grocery/jobs';
+import { spawnGroceryJob, isJobRunning } from '@/features/grocery/jobs';
 
 /**
  * POST /api/grocery/build-carts — optional { itemIds: string[] } limits the
@@ -12,6 +12,14 @@ import { spawnGroceryJob } from '@/features/grocery/jobs';
 export const POST: APIRoute = async ({ cookies, request }) => {
   const denied = requireSession(cookies);
   if (denied) return denied;
+
+  // A build agent already running → don't reassemble or spawn a second one
+  // (concurrent clicks would rewrite cart-request.json mid-run and clobber).
+  if (await isJobRunning('build-carts')) {
+    return new Response(JSON.stringify({ status: 'running', instant: 0, queued: 0 }), {
+      status: 202, headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   let itemIds: string[] | undefined;
   try {

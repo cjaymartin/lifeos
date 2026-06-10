@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "LifeOS Browser Extension",
+  "version": "0.2.1",
+  "description": "Bridges your browser session to LifeOS. Today: syncs Walmart order history + cart to speed up grocery cart building (read-only, never places orders). Built to grow into more LifeOS browser integrations over time.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.walmart.com/*",
+    "*://lifeos.cjay.io/*",
+    "*://lifeos.localhost/*",
+    "*://lifeos.wolfdivided/*",
+    "*://localhost/*",
+    "*://127.0.0.1/*"
+  ],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://lifeos.cjay.io/*",
+        "*://lifeos.localhost/*",
+        "*://lifeos.wolfdivided/*",
+        "*://localhost/*",
+        "*://127.0.0.1/*"
+      ],
+      "js": ["announce.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.walmart.com/orders*", "https://www.walmart.com/account/orders*"],
+      "js": ["content-orders.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.walmart.com/cart*", "https://www.walmart.com/checkout*"],
+      "js": ["content-cart.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "action": { "default_title": "LifeOS Browser Extension", "default_popup": "options.html" },
+  "browser_specific_settings": {
+    "gecko": { "id": "lifeos-browser-extension@cjay", "strict_min_version": "121.0" }
+  }
+}

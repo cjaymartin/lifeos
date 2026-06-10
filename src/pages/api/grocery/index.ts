@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import {
   loadGrocery, saveGrocery, loadStaples, loadGroceryState,
-  categorizeHeuristic, makeItemId,
+  loadCategoryMap, resolveCategory, makeItemId,
 } from '@/features/grocery/ops';
 import type { GroceryItem } from '@/features/grocery/types';
 import { normalizeName, DEFAULT_CATEGORIES } from '@/features/grocery/types';
@@ -46,7 +46,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     return new Response('Bad request', { status: 400 });
   }
 
-  const [grocery, staples] = await Promise.all([loadGrocery(), loadStaples()]);
+  const [grocery, staples, categoryMap] = await Promise.all([loadGrocery(), loadStaples(), loadCategoryMap()]);
   const added: GroceryItem[] = [];
 
   for (const raw of names) {
@@ -55,7 +55,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     // Don't add exact duplicates of an unchecked item
     if (grocery.items.some(i => normalizeName(i.name) === norm && !i.checked)) continue;
 
-    const [heurCat, confirmed] = category ? [category, true] : categorizeHeuristic(name);
+    const [heurCat, confirmed] = category ? [category, true] : resolveCategory(name, categoryMap);
     const staple = staples.find(s => normalizeName(s.name) === norm);
     added.push({
       id: makeItemId(name),

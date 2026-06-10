@@ -7,12 +7,14 @@ import {
   Settings,
   Sun,
   Moon,
+  Download,
   type LucideIcon,
 } from 'lucide-react';
 import * as icons from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { detectExtension } from '@/lib/client/extension';
 import type { Stack } from '@/features';
 
 interface Props {
@@ -82,6 +84,15 @@ export default function Sidebar({ stacks, currentPath }: Props) {
   // #418 hydration mismatch on every page load (NIM-9 / #4). The real stored
   // theme is adopted post-mount in the effect below.
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  // Show the "Download Extension" prompt only once we've actually failed to
+  // detect the extension (avoid a flash before detection resolves).
+  const [extMissing, setExtMissing] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    detectExtension().then((v) => { if (!cancelled) setExtMissing(!v); });
+    return () => { cancelled = true; };
+  }, []);
 
   // After mount, adopt the persisted collapsed state. This corrects the sidebar
   // width to the user's preference without affecting the hydration markup (which
@@ -177,6 +188,32 @@ export default function Sidebar({ stacks, currentPath }: Props) {
 
         {/* Bottom controls */}
         <div className="p-2 space-y-0.5">
+          {/* Download Extension — only when the extension isn't detected */}
+          {extMissing && (
+            collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href="/settings/logins?tab=extension"
+                    className="flex w-full items-center justify-center rounded-md p-2 text-primary transition-colors hover:bg-accent"
+                    aria-label="Download Extension"
+                  >
+                    <Download size={16} />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="right">Download Extension</TooltipContent>
+              </Tooltip>
+            ) : (
+              <a
+                href="/settings/logins?tab=extension"
+                className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm text-primary transition-colors hover:bg-accent"
+              >
+                <Download size={16} className="shrink-0" />
+                <span>Download Extension</span>
+              </a>
+            )
+          )}
+
           {/* Settings */}
           {collapsed ? (
             <Tooltip>

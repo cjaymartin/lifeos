@@ -26,6 +26,8 @@ export interface GroceryItem {
   source: ItemSource;
   /** Cart builds must match this item at this retailer only */
   buyFrom?: Retailer;
+  /** Preferred purchase count — overrides the parsed quantity at build time */
+  defaultQty?: number;
 }
 
 export interface GroceryData {
@@ -44,6 +46,8 @@ export interface Staple {
   restockAt?: RestockAt;
   /** Cart builds must match this staple's items at this retailer only */
   buyFrom?: Retailer;
+  /** Preferred purchase count — carried onto the list item when auto-re-added */
+  defaultQty?: number;
 }
 
 export interface CartMatch {
@@ -63,6 +67,22 @@ export interface CartMatch {
   confidence?: 'high' | 'medium' | 'low';
   /** 'reorder' = exact product from past orders; 'new' = fresh web match */
   source?: 'reorder' | 'new';
+  /** Stock state of the matched product (absent ⇒ 'ok') */
+  status?: 'ok' | 'out_of_stock' | 'unavailable';
+  /** Ranked fallback products when the match is out of stock */
+  alternatives?: ProductCandidate[];
+  /** The agent auto-picked an alternative — flagged so the UI can surface it */
+  substituted?: boolean;
+}
+
+/** A candidate product the agent surfaced as a possible match/substitute. */
+export interface ProductCandidate {
+  productId: string;
+  product: string;
+  price?: string;
+  productUrl?: string;
+  /** Free-form size/pack ("52 fl oz", "3-pack") to help the size decision */
+  size?: string;
 }
 
 export interface RetailerCart {
@@ -87,6 +107,25 @@ export interface PurchaseRecord {
   quantity?: string;
   source: Retailer | 'in-store' | 'scan';
   orderId?: string;
+  /** Set when a later "item unavailable / refunded" email reverses this buy */
+  refunded?: boolean;
+}
+
+/** A product the user has bought before, captured from order history by the
+ *  browser extension. The build-carts agent greps these locally to reorder
+ *  exact products — no Gmail, no network. */
+export interface OrderedProduct {
+  retailer: Retailer;
+  productId: string;
+  product: string;
+  productUrl?: string;
+  /** YYYY-MM-DD of the most recent order seen for this product */
+  lastOrdered?: string;
+}
+
+export interface OrderHistory {
+  syncedAt: string;
+  products: OrderedProduct[];
 }
 
 /** A specific retailer product pinned to (or learned for) an item name */
