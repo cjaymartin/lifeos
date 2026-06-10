@@ -19,13 +19,22 @@ interface Message {
   proposalStatus?: 'pending' | 'approved' | 'declined';
 }
 
-interface Props { stackId: string; stackLabel: string; currentPath?: string; pageTitle?: string }
+interface Props {
+  stackId: string;
+  stackLabel: string;
+  currentPath?: string;
+  pageTitle?: string;
+  /** API endpoint to post chat turns to. Defaults to the per-stack route; the
+   *  dashboard assistant points this at the cross-feature hand-off route. */
+  endpoint?: string;
+}
 
 const SUGGESTIONS: Record<string, string[]> = {
   recipes: ['What recipes do I have?', 'Add a new recipe', 'Suggest a substitution'],
   budget: ['What did I spend this month?', 'Show my top categories', 'How am I tracking vs budget?'],
   journal: ['What did I write about recently?', 'Summarize this week', 'Find entries about a topic'],
   grocery: ['Add ingredients for tacos', 'What am I low on?', 'Plan a dinner from my recipes'],
+  dashboard: ["What's my day look like?", 'What am I low on for dinner?', 'Any deliveries coming?'],
 };
 
 function getSuggestions(stackId: string): string[] {
@@ -36,7 +45,7 @@ function getSuggestions(stackId: string): string[] {
   ];
 }
 
-export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitle }: Props) {
+export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitle, endpoint = '/api/chat' }: Props) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -93,7 +102,7 @@ export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitl
     abortRef.current = new AbortController();
     const timer = setTimeout(() => abortRef.current?.abort(), 300_000);
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -5,4 +5,5 @@ import { populateDailyJob } from './jobs';
 export const dailyFeature: Feature = {
   id: 'daily',
   jobs: { 'populate-daily': populateDailyJob },
+  hasChatGuide: true, // chat.md guides the dashboard assistant's briefing answers
 };
