@@ -279,6 +279,36 @@ describe('acceptSubstitute', () => {
   });
 });
 
+describe('changeCartLineProduct', () => {
+  it('swaps a line to a pasted product URL and pins it', async () => {
+    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeJson('carts.json', {
+      builtAt: 'x',
+      carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [
+        { itemId: 'milk-1', name: 'Milk', productId: 'OLD', product: 'Wrong Milk', qty: 1, addedQty: 1 },
+      ] }],
+    });
+
+    const res = await grocery.changeCartLineProduct('walmart', 'milk-1', 'https://www.walmart.com/ip/Some-Slug/998877');
+    expect(res.ok).toBe(true);
+
+    const line = readJson('carts.json').carts[0].items[0];
+    expect(line.productId).toBe('998877');
+    expect(line.substituted).toBe(true);
+    expect(line.addedQty).toBeUndefined();
+    expect(readJson('product-map.json').milk).toMatchObject({ productId: '998877', pinned: true });
+  });
+
+  it('rejects an unparseable or wrong-retailer URL', async () => {
+    writeJson('carts.json', {
+      builtAt: 'x',
+      carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [{ itemId: 'm', name: 'M', productId: '1', qty: 1 }] }],
+    });
+    expect((await grocery.changeCartLineProduct('walmart', 'm', 'not a url')).error).toBe('unparseable');
+    expect((await grocery.changeCartLineProduct('walmart', 'm', 'https://www.amazon.com/dp/B0ABCDEFGH')).error).toBe('retailer-mismatch');
+  });
+});
+
 describe('loadGroceryState — unavailable/refunded scan', () => {
   it('re-adds an unavailable item, refunds its purchase, and resets the staple', async () => {
     writeJson('grocery.json', { lastUpdated: '', items: [] });

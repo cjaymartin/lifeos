@@ -158,6 +158,46 @@ test.describe('grocery stack', () => {
       .toMatchObject({ productId: 'PC1', pinned: true });
   });
 
+  test('the item settings menu renders visibly (portal, not clipped)', async ({ page }) => {
+    const name = `e2e gearcheck ${Date.now()}`;
+    await page.goto('/grocery');
+    const input = page.getByPlaceholder(/add an item/i);
+    await input.fill(name);
+    await input.press('Enter');
+    await expect(page.getByText(name).first()).toBeVisible();
+
+    // Open the cog — the menu is portalled to <body>, so it must be visible even
+    // though the category accordion has overflow-hidden.
+    await page.getByRole('button', { name: `Settings for ${name}` }).click();
+    await expect(page.getByText('Always buy from')).toBeVisible();
+  });
+
+  test('changing a cart line product via URL swaps and pins it', async ({ page }) => {
+    writeSandboxJson('src/content/grocery/carts.json', {
+      builtAt: '2026-06-10T00:00:00.000Z',
+      carts: [{
+        retailer: 'walmart',
+        label: 'Walmart',
+        unmatched: [],
+        items: [{ itemId: 'chg-1', name: 'Chg Coffee', product: 'Wrong Coffee', price: '$5.00', productId: 'WRONG1', productUrl: 'https://www.walmart.com/ip/WRONG1', qty: 1, source: 'reorder' }],
+      }],
+    });
+
+    await page.goto('/grocery');
+    await expect(page.getByText('Built carts')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Change product for Chg Coffee' }).click();
+    await page.getByPlaceholder(/walmart\.com\/ip/i).fill('https://www.walmart.com/ip/Right-Coffee/445566');
+    await page.getByRole('button', { name: 'Set product' }).click();
+
+    await expect
+      .poll(() => {
+        const m = readSandboxJson<Record<string, any>>('src/content/grocery/product-map.json');
+        return m['chg coffee'] ?? null;
+      })
+      .toMatchObject({ productId: '445566', pinned: true });
+  });
+
   test('an out-of-stock line offers a substitute that gets applied', async ({ page }) => {
     writeSandboxJson('src/content/grocery/carts.json', {
       builtAt: '2026-06-09T00:00:00.000Z',

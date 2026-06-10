@@ -1,9 +1,11 @@
-# LifeOS Grocery Sync — browser extension
+# LifeOS Browser Extension
 
-Reads your **Walmart order history** and **cart** in your own logged-in browser
-session and syncs them to LifeOS. This lets cart-building reorder the exact
-products you actually buy **without Gmail and without spidering Walmart** — the
-build-carts agent just greps your local order-history catalog.
+Bridges your browser session to LifeOS. Its first job: read your **Walmart order
+history** and **cart** in your own logged-in session and sync them to LifeOS, so
+cart-building reorders the exact products you actually buy **without Gmail and
+without spidering Walmart** — the build-carts agent just greps your local
+order-history catalog. (Named generically because it's expected to grow into
+more LifeOS browser integrations over time.)
 
 - **Read-only.** It only reads page content. It never clicks buy/reorder, never
   places an order, never touches payment or login.
@@ -31,7 +33,7 @@ tab (e.g. `https://lifeos.cjay.io/api/grocery/ingest-token`) and copy the
 1. Go to `chrome://extensions`.
 2. Toggle **Developer mode** (top-right) on.
 3. Click **Load unpacked** and select this folder
-   (`extension/lifeos-grocery/`).
+   (`extension/lifeos/`).
 4. Click the extension's icon → set your **LifeOS URL** and **token** →
    **Grant access & save** (approve the permission prompt for your LifeOS host).
 

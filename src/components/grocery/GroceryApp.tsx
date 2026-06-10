@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShoppingCart, RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Star,
-  ChevronRight, Plus, Loader2, Trash2, ListChecks, Search, Settings, Pin,
+  ChevronRight, Plus, Loader2, Trash2, ListChecks, Search, Settings, Pin, Pencil,
 } from 'lucide-react';
 import type {
   GroceryState, GroceryItem, Staple, StapleStatus, Retailer, CartsData, ProductRef, RestockAt,
@@ -68,6 +69,43 @@ function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, re
   const [error, setError] = useState<string | null>(null);
   const [rename, setRename] = useState(name);
   const [qty, setQty] = useState(defaultQty ? String(defaultQty) : '');
+  // Fixed-position anchor for the menu — it's rendered in a portal so it can't
+  // be clipped by an ancestor's overflow-hidden (the category accordions clip).
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  const place = useCallback(() => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+  }, []);
+
+  const openMenu = () => {
+    setUrl(''); setError(null); setRename(name); setQty(defaultQty ? String(defaultQty) : '');
+    place();
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || btnRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const reposition = () => place();
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [open, place]);
 
   const active = !!pin || !!buyFrom || (restockAt !== undefined && restockAt !== 'low') || !!defaultQty;
 
@@ -101,7 +139,8 @@ function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, re
   return (
     <span className="relative">
       <button
-        onClick={() => { setOpen(o => !o); setUrl(''); setError(null); setRename(name); setQty(defaultQty ? String(defaultQty) : ''); }}
+        ref={btnRef}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         title={`Settings for ${name}${pin ? ` — pinned: ${pin.product ?? pin.productId}` : ''}${buyFrom ? ` — buys from ${RETAILER_LABELS[buyFrom]}` : ''}`}
         aria-label={`Settings for ${name}`}
         className={`p-1 rounded transition-colors ${
@@ -111,8 +150,11 @@ function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, re
         }`}>
         <Settings className="w-4 h-4" />
       </button>
-      {open && (
-        <span className="absolute right-0 top-full mt-1 z-20 w-72 rounded-lg border border-border bg-card shadow-lg p-3 block space-y-3">
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 50 }}
+          className="w-72 rounded-lg border border-border bg-card shadow-lg p-3 space-y-3">
           {/* Rename */}
           <span className="block space-y-1">
             <span className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Name</span>
@@ -208,7 +250,8 @@ function ItemSettings({ name, pin, onSavePin, onClearPin, buyFrom, onBuyFrom, re
               </button>
             </span>
           </span>
-        </span>
+        </div>,
+        document.body,
       )}
     </span>
   );
@@ -647,6 +690,25 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
     mutate(s => s, () => groceryClient.acceptSubstitute(retailer, itemId, productId), { sync: 'always' }),
     [mutate]);
 
+  // Inline "wrong product?" editor on a cart line: which line is being edited,
+  // the pasted URL, and any error.
+  const [editingLine, setEditingLine] = useState<string | null>(null);
+  const [editUrl, setEditUrl] = useState('');
+  const [editErr, setEditErr] = useState<string | null>(null);
+
+  const changeCartProduct = useCallback(async (retailer: Retailer, itemId: string) => {
+    const url = editUrl.trim();
+    if (!url) return;
+    try {
+      await groceryClient.changeCartProduct(retailer, itemId, url);
+      setEditingLine(null); setEditUrl(''); setEditErr(null);
+      await refetch();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      setEditErr(msg && !msg.startsWith('HTTP') ? msg : 'Paste a walmart.com/ip/… product link for this retailer.');
+    }
+  }, [editUrl, refetch]);
+
   /** One-click "always use this" — pin the cart line's exact product so reorders
    *  never re-guess (pins are never overridden by the agent or learning). */
   const pinLine = useCallback((retailer: Retailer, m: { name: string; productId?: string; product?: string; productUrl?: string }) => {
@@ -1040,6 +1102,20 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                             </button>
                           );
                         })()}
+                        {m.productId && (
+                          <button
+                            onClick={() => {
+                              setEditingLine(editingLine === m.itemId ? null : m.itemId);
+                              setEditUrl(''); setEditErr(null);
+                            }}
+                            title="Wrong product? Paste the correct link"
+                            aria-label={`Change product for ${m.name}`}
+                            className={`shrink-0 p-0.5 rounded transition-colors ${
+                              editingLine === m.itemId ? 'text-primary' : 'text-muted-foreground/0 group-hover/cartitem:text-muted-foreground/40 hover:!text-primary'
+                            }`}>
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
                         <button
                           onClick={() => removeCartItem(cart.retailer, m.itemId)}
                           title="Remove from this cart (stays on your list)"
@@ -1048,6 +1124,32 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                           <X className="w-3 h-3" />
                         </button>
                       </div>
+                      {editingLine === m.itemId && (
+                        <div className="mt-1 ml-1 pl-2 border-l-2 border-primary/40 space-y-1">
+                          <p className="text-[11px] text-muted-foreground">Paste the correct product link — it replaces this line and is remembered.</p>
+                          <input
+                            value={editUrl}
+                            onChange={e => { setEditUrl(e.target.value); setEditErr(null); }}
+                            onKeyDown={e => { if (e.key === 'Enter') changeCartProduct(cart.retailer, m.itemId); if (e.key === 'Escape') { setEditingLine(null); setEditUrl(''); setEditErr(null); } }}
+                            placeholder={cart.retailer === 'amazon' ? 'amazon.com/dp/… link' : 'walmart.com/ip/… link'}
+                            autoFocus
+                            className="w-full bg-transparent border border-border rounded-md px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30"
+                          />
+                          {editErr && <p className="text-[11px] text-destructive">{editErr}</p>}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => changeCartProduct(cart.retailer, m.itemId)}
+                              className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+                              Set product
+                            </button>
+                            <button
+                              onClick={() => { setEditingLine(null); setEditUrl(''); setEditErr(null); }}
+                              className="text-[11px] px-2.5 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       {oos && (m.alternatives?.length ?? 0) > 0 && (
                         <div className="mt-1 ml-1 pl-2 border-l-2 border-warning/40 space-y-0.5">
                           <p className="text-[11px] text-warning">Pick a substitute:</p>

@@ -590,6 +590,42 @@ export async function acceptSubstitute(
   return { ok: true };
 }
 
+/** Replace a cart line's product from a pasted product URL (the "wrong product?"
+ *  fix) without remove+re-add. Swaps the line, rebuilds the cart link, marks it
+ *  pending, and PINS the chosen product so the next build doesn't re-guess. */
+export async function changeCartLineProduct(
+  retailer: Retailer,
+  itemId: string,
+  url: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const ref = parseProductUrl(url);
+  if (!ref) return { ok: false, error: 'unparseable' };
+  if (ref.retailer !== retailer) return { ok: false, error: 'retailer-mismatch' };
+
+  const carts = await loadCarts();
+  const cart = carts?.carts.find(c => c.retailer === retailer);
+  if (!carts || !cart) return { ok: false, error: 'no-cart' };
+  const line = cart.items.find(m => m.itemId === itemId);
+  if (!line) return { ok: false, error: 'no-line' };
+
+  line.productId = ref.productId;
+  line.productUrl = ref.productUrl;
+  line.product = undefined; // title unknown from a bare URL; a later build/observe fills it
+  line.price = undefined;
+  line.status = 'ok';
+  line.substituted = true;
+  line.source = 'new';
+  line.confidence = 'medium';
+  delete line.addedQty;
+  delete line.alternatives;
+  cart.cartUrl = rebuildCartUrl(cart);
+  await saveCarts(carts);
+
+  // The user explicitly picked this product → pin it (authoritative).
+  await setPin(line.name, { retailer: ref.retailer, productId: ref.productId, productUrl: ref.productUrl });
+  return { ok: true };
+}
+
 /* ── Checkout ──────────────────────────────────────────────────────────────
    Remove purchased items from the list, restock matching staples, and log
    to purchases.json. Used by the cart "I checked out" buttons and the
