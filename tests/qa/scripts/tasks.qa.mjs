@@ -1,9 +1,8 @@
-// QA: tasks stack — see tests/qa/cases/tasks.md
+// QA: tasks stack (read-only flows) — see tests/qa/cases/tasks.md.
 //
-// NOTE: task mutations (add/complete/edit/delete) are intentionally NOT
-// exercised — the local build bakes the real Todoist token (import.meta.env),
-// so mutations would write to the real Todoist account. See the QA issue on
-// e2e isolation. Read-only flows only.
+// Mutations (add/complete/edit/delete) live in the opt-in tasks-mutations area,
+// which runs against an in-memory fake provider (LIFEOS_FAKE_TASKS=1) — never
+// the real Todoist account (NIM-7). This area stays read-only.
 import { startQA, expectVisible, readSandboxJson, BASE } from './qa-lib.mjs';
 
 const qa = await startQA('tasks');

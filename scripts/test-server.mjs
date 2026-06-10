@@ -8,7 +8,13 @@
 // src/content and the server reads/writes the copy.
 //
 // Env is scrubbed so no real provider (Todoist, encrypted secrets) is ever
-// reachable from tests — the sync loop no-ops without a token.
+// reachable from tests — the sync loop no-ops without a token. Runtime secrets
+// are read from process.env only (never the build-time import.meta.env that
+// `astro build` inlines), so this scrub is now actually effective even on a dev
+// machine with a populated .env (NIM-7). To exercise task mutations against an
+// in-memory fake backend instead, the parent sets LIFEOS_FAKE_TASKS=1 — it
+// survives the scrub below (no secret-ish name) and flips getProvider() to the
+// fake. The default (unset) run shows Todoist as "Not connected".
 
 import { cpSync, mkdirSync, rmSync, readFileSync, writeFileSync, globSync } from 'fs';
 import { join, dirname } from 'path';

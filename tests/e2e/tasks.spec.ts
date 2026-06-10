@@ -13,9 +13,10 @@ test.describe('tasks stack', () => {
     for (const name of ['Today', 'Upcoming', 'Completed', 'Stats']) {
       await expect(page.getByRole('button', { name })).toBeVisible();
     }
-    // Quick-add is gated on a configured Todoist connection, which depends on
-    // the env the build was made with (CI builds without a token). Whichever
-    // state we're in, exactly one of the two surfaces must render.
+    // Quick-add is gated on a configured connection. In the default isolated
+    // sandbox that's always "Not connected" (see tasks-isolation.spec.ts);
+    // under the fake-provider run it's quick-add. Either surface satisfies this
+    // smoke check — the dedicated specs assert each precisely.
     const quickAdd = page.getByPlaceholder('Add a task…');
     const notConnected = page.getByText("Todoist isn't connected yet");
     await expect(quickAdd.or(notConnected).first()).toBeVisible();

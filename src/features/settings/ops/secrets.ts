@@ -15,8 +15,10 @@ import type { AccountId, AccountSecrets, SecretsFile } from './settings-types';
 export const SECRETS_FILE = join(process.cwd(), 'src/content/settings/secrets.json.enc');
 
 function getKey(): Buffer | null {
-  const hex =
-    (import.meta as any).env?.SECRETS_KEY ?? process.env.SECRETS_KEY ?? '';
+  // process.env ONLY — never import.meta.env (which `astro build` would inline
+  // into dist/, baking a real key into the build and letting the sandboxed test
+  // server decrypt real secrets despite its env scrub — NIM-7).
+  const hex = process.env.SECRETS_KEY ?? '';
   if (!/^[0-9a-fA-F]{64}$/.test(hex.trim())) return null;
   return Buffer.from(hex.trim(), 'hex');
 }

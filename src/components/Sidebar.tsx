@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   ChevronRight,
@@ -70,19 +70,20 @@ function NavItem({
 }
 
 export default function Sidebar({ stacks, currentPath }: Props) {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('sidebar-collapsed') === 'true';
-    }
-    return false;
-  });
+  // Always seed to `false` (expanded) so the first client render matches the SSR
+  // markup (SSR has no `window`, so it always renders the expanded `w-56`
+  // sidebar). Reading localStorage in the initializer would diverge from SSR on
+  // a `sidebar-collapsed=true` client → React #418 hydration mismatch + a
+  // w-14↔w-56 layout reflow on every page load (#20, sibling of NIM-9 / #4). The
+  // real stored value is adopted post-mount in the effect below.
+  const [collapsed, setCollapsed] = useState(false);
 
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('theme') as 'dark' | 'light') ?? 'dark';
-    }
-    return 'dark';
-  });
+  // Always seed to 'dark' so the first client render matches the SSR markup
+  // (SSR has no `window`, so it always renders 'dark'). Reading localStorage in
+  // the initializer would diverge from SSR on a `theme=light` client → React
+  // #418 hydration mismatch on every page load (NIM-9 / #4). The real stored
+  // theme is adopted post-mount in the effect below.
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   // Show the "Download Extension" prompt only once we've actually failed to
   // detect the extension (avoid a flash before detection resolves).
@@ -93,11 +94,44 @@ export default function Sidebar({ stacks, currentPath }: Props) {
     return () => { cancelled = true; };
   }, []);
 
+  // After mount, adopt the persisted collapsed state. This corrects the sidebar
+  // width to the user's preference without affecting the hydration markup (which
+  // must stay the SSR-default expanded sidebar — see the useState seed above).
   useEffect(() => {
+    setCollapsed(localStorage.getItem('sidebar-collapsed') === 'true');
+  }, []);
+
+  // Persist whenever the user toggles. Skip the initial mount: on mount
+  // `collapsed` is still the SSR default (`false`) which may not match the stored
+  // value yet — writing here would clobber a stored `true` before the adoption
+  // effect above gets a chance to read it.
+  const collapsedMounted = useRef(false);
+  useEffect(() => {
+    if (!collapsedMounted.current) {
+      collapsedMounted.current = true;
+      return;
+    }
     localStorage.setItem('sidebar-collapsed', String(collapsed));
   }, [collapsed]);
 
+  // After mount, adopt the theme the AppLayout inline FOUC script already
+  // applied to <html> (sourced from localStorage). This corrects the toggle
+  // control to reflect the active theme without affecting the hydration markup.
   useEffect(() => {
+    const stored = (localStorage.getItem('theme') as 'dark' | 'light') ?? 'dark';
+    setTheme(stored);
+  }, []);
+
+  // Apply + persist the theme whenever the user toggles it. Skip the initial
+  // mount: the inline FOUC script already set the class and localStorage, and on
+  // mount `theme` is still the SSR default ('dark') which may not match the
+  // stored value yet — writing here would clobber it and flash the page.
+  const themeMounted = useRef(false);
+  useEffect(() => {
+    if (!themeMounted.current) {
+      themeMounted.current = true;
+      return;
+    }
     const root = document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
     root.classList.toggle('light', theme === 'light');
