@@ -3,7 +3,7 @@
 import { readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import type {
-  CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, ProductRef, PurchaseRecord, Retailer, Staple,
+  CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, OrderHistory, OrderedProduct, ProductRef, PurchaseRecord, Retailer, Staple,
 } from '@/features/grocery/types';
 import { buildAddToCartUrl, normalizeName, RETAILER_LABELS, DEFAULT_CATEGORIES } from '@/features/grocery/types';
 
@@ -18,6 +18,9 @@ export const PRODUCT_MAP_FILE = join(DIR, 'product-map.json');
 // Learned category memory: normalized item name → category. Consulted before
 // the keyword heuristic; written on user override and agent confirmation.
 export const CATEGORY_MAP_FILE = join(DIR, 'category-map.json');
+// Past-purchased products captured from Walmart order history by the browser
+// extension. build-carts greps this locally to reorder exact products.
+export const ORDER_HISTORY_FILE = join(DIR, 'order-history.json');
 // One-shot marker so the "re-file existing Other staples" migration runs once.
 const CATEGORIES_MIGRATED_FILE = join(DIR, '.categories-migrated');
 // Optional per-build item selection, written by the build-carts API and read
@@ -91,6 +94,46 @@ export async function setPin(
   map[normalizeName(name)] = pin;
   await saveProductMap(map);
   return pin;
+}
+
+export async function loadOrderHistory(): Promise<OrderHistory> {
+  return (await readJson<OrderHistory>(ORDER_HISTORY_FILE)) ?? { syncedAt: '', products: [] };
+}
+
+export async function saveOrderHistory(history: OrderHistory): Promise<void> {
+  await writeJson(ORDER_HISTORY_FILE, history);
+}
+
+/** Merge products captured from order history (extension) into the local
+ *  catalog, deduped by productId — newest lastOrdered wins. The build-carts
+ *  agent greps this instead of Gmail. */
+export async function applyOrderHistory(
+  retailer: Retailer,
+  products: { productId: string; product: string; productUrl?: string; lastOrdered?: string }[],
+): Promise<{ added: number; updated: number; total: number }> {
+  const history = await loadOrderHistory();
+  const byId = new Map(history.products.map(p => [p.productId, p]));
+  let added = 0, updated = 0;
+  for (const p of products) {
+    const productId = String(p.productId ?? '').trim();
+    const product = String(p.product ?? '').trim();
+    if (!productId || !product) continue;
+    const existing = byId.get(productId);
+    if (existing) {
+      existing.product = product || existing.product;
+      if (p.productUrl) existing.productUrl = p.productUrl;
+      if (p.lastOrdered && (!existing.lastOrdered || p.lastOrdered > existing.lastOrdered)) existing.lastOrdered = p.lastOrdered;
+      updated++;
+    } else {
+      const np: OrderedProduct = { retailer, productId, product, productUrl: p.productUrl, lastOrdered: p.lastOrdered };
+      byId.set(productId, np);
+      history.products.push(np);
+      added++;
+    }
+  }
+  history.syncedAt = new Date().toISOString();
+  await saveOrderHistory(history);
+  return { added, updated, total: history.products.length };
 }
 
 /** Parse a Walmart/Amazon product URL into a ProductRef (null if unrecognized). */

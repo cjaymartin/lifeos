@@ -18,6 +18,7 @@ You build links only. **Never** place, submit, or check out an order; never log 
 - `src/content/grocery/carts.json` (may not exist) — the CURRENT cart state. You MERGE into it, never replace it wholesale (Step 3).
 - Skip any item whose existing cart line is already fully added (`addedQty >= qty`) — it's in the user's real retailer cart; re-matching it would cause double-adds.
 - `src/content/grocery/product-map.json` (may not exist) — the product memory: `{ "<normalized item name>": { "retailer", "productId", "product", "productUrl", "pinned"? } }`. Entries with `"pinned": true` were chosen by the user.
+- `src/content/grocery/order-history.json` (may not exist) — past-purchased products captured from Walmart order history: `{ "syncedAt", "products": [{ "retailer", "productId", "product", "productUrl", "lastOrdered"? }] }`. This is your **local reorder catalog** — grep it instead of the web whenever you can.
 - `src/content/grocery/staples.json` — staple names help disambiguate.
 
 ## Step 2 — Match each item, in strict priority order
@@ -27,17 +28,19 @@ You build links only. **Never** place, submit, or check out an order; never log 
 **`buyFrom` override:** an item with `"buyFrom": "amazon"` (or `"walmart"`) must be matched at that retailer ONLY — an amazon-buyFrom item goes straight to the Amazon cart (skip the Walmart steps for it), and a walmart-buyFrom item never falls back to Amazon (unmatched instead).
 
 1. **product-map.json hit** → reuse it directly with **ZERO lookups** — no Gmail, no web search, no fetch, no "confirming" or cross-checking of any kind. Copy the entry into the cart and move on; this should take seconds. `source: "reorder"`, confidence `high`. `pinned: true` entries are the user's explicit choice — use them verbatim even if you'd pick differently; if the entry lacks a `product` title, display the list item's name instead (do NOT look the title up). A pinned `amazon` entry goes in the Amazon cart — that's the user's call, not a fallback violation.
-2. **Web search Walmart** (only if 1 misses) → try `WebFetch` of the direct search page `https://www.walmart.com/search?q=<url-encoded item>` first (optionally `&sort=best_seller`); fall back to `WebSearch` for `site:walmart.com/ip <item name>`. Extract the item id from `walmart.com/ip/<slug>/<itemId>`. `source: "new"`.
+2. **Local order-history catalog** (`order-history.json`, if present) → fuzzy-match the item name against the `product` titles of past purchases and reuse that exact `productId`/`productUrl`. This is a **local file grep — ZERO network, no Gmail.** Example: "fairlife 2% milk" → the past "Fairlife 2% Ultra-Filtered Milk, 52 fl oz" entry. `source: "reorder"`, confidence `high`. Prefer the most recently ordered (`lastOrdered`) when several match.
+3. **Web search Walmart** (only if 1 and 2 miss) → try `WebFetch` of the direct search page `https://www.walmart.com/search?q=<url-encoded item>` first (optionally `&sort=best_seller`); fall back to `WebSearch` for `site:walmart.com/ip <item name>`. Extract the item id from `walmart.com/ip/<slug>/<itemId>`. `source: "new"`.
    - **Same-container rule:** when parsing a search/results page, pair each product title with the link in the *same result block* — never a title from one result with a URL from another, and skip anything marked "Sponsored". Mismatched pairs are how wrong products end up in carts.
    - **Picking among candidates:** prefer ordinary, household-normal sizes. When ratings are within ~0.5★ of each other, prefer the higher review count (4.0★ × 10,000 beats 5.0★ × 100). Prefer items sold/fulfilled by Walmart over third-party marketplace sellers (marketplace listings often carry inflated prices and flaky stock).
-3. **Amazon fallback** (only if the item genuinely can't be found at Walmart at all) → search `site:amazon.com <item>`, extract the ASIN from `/dp/<ASIN>`. Same same-container and review-count rules. These go in a separate minimal Amazon cart.
-4. Still nothing plausible → `unmatched` on the Walmart cart. Never force a bad match.
+4. **Amazon fallback** (only if the item genuinely can't be found at Walmart at all) → search `site:amazon.com <item>`, extract the ASIN from `/dp/<ASIN>`. Same same-container and review-count rules. These go in a separate minimal Amazon cart.
+5. Still nothing plausible → `unmatched` on the Walmart cart. Never force a bad match.
 
-> **Do NOT use Gmail.** Cart-building relies on the product memory (built up from
-> your confirmed purchases and an order-history sync) plus web search — never
-> email scraping. Gmail is only used by the separate purchase-scan job.
+> **Do NOT use Gmail.** Cart-building reorders from the product memory and the
+> local order-history catalog (both filled from the user's own session — see the
+> grocery browser extension), with web search as the only fallback. Never scrape
+> email. Gmail is used solely by the separate purchase-scan job.
 
-**Verify on the product page (every `source: "new"` match):** `WebFetch` the actual `walmart.com/ip/<id>` (or `amazon.com/dp/<ASIN>`) page and confirm three things — the title matches what you searched for, a current price is shown, and it isn't out of stock / unavailable. Search-result snippets routinely show the wrong price or a different variant (promotions, sellers, pack sizes), and a redirect or title mismatch means the id is wrong — discard and try the next candidate. Only verified matches get confidence `high`; if the page is bot-gated and won't load, keep the match but cap confidence at `medium`. Saved-product reorders (priority 1) skip verification — the user already bought them.
+**Verify on the product page (every `source: "new"` match):** `WebFetch` the actual `walmart.com/ip/<id>` (or `amazon.com/dp/<ASIN>`) page and confirm three things — the title matches what you searched for, a current price is shown, and it isn't out of stock / unavailable. Search-result snippets routinely show the wrong price or a different variant (promotions, sellers, pack sizes), and a redirect or title mismatch means the id is wrong — discard and try the next candidate. Only verified matches get confidence `high`; if the page is bot-gated and won't load, keep the match but cap confidence at `medium`. Reorders from the product memory or the local catalog (priorities 1–2) skip verification — the user already bought them.
 
 **Out of stock → offer fallbacks, never silently drop.** If the best product (including a pinned or past-order one) is out of stock / unavailable on its page, do NOT just discard it. Instead:
 - Keep the line but set `"status": "out_of_stock"`.

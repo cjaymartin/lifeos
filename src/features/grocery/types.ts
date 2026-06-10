@@ -111,6 +111,23 @@ export interface PurchaseRecord {
   refunded?: boolean;
 }
 
+/** A product the user has bought before, captured from order history by the
+ *  browser extension. The build-carts agent greps these locally to reorder
+ *  exact products — no Gmail, no network. */
+export interface OrderedProduct {
+  retailer: Retailer;
+  productId: string;
+  product: string;
+  productUrl?: string;
+  /** YYYY-MM-DD of the most recent order seen for this product */
+  lastOrdered?: string;
+}
+
+export interface OrderHistory {
+  syncedAt: string;
+  products: OrderedProduct[];
+}
+
 /** A specific retailer product pinned to (or learned for) an item name */
 export interface ProductRef {
   retailer: Retailer;

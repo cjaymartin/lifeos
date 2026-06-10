@@ -311,6 +311,29 @@ describe('loadGroceryState — unavailable/refunded scan', () => {
   });
 });
 
+describe('applyOrderHistory', () => {
+  it('adds new products, dedupes by productId, and keeps the newest lastOrdered', async () => {
+    rm('order-history.json');
+    let r = await grocery.applyOrderHistory('walmart', [
+      { productId: '1', product: 'Fairlife 2% 52oz', productUrl: 'u1', lastOrdered: '2026-05-01' },
+      { productId: '2', product: 'Paper Plates 200ct' },
+    ]);
+    expect(r).toMatchObject({ added: 2, updated: 0, total: 2 });
+
+    r = await grocery.applyOrderHistory('walmart', [
+      { productId: '1', product: 'Fairlife 2% 52oz', lastOrdered: '2026-06-01' }, // newer
+    ]);
+    expect(r).toMatchObject({ added: 0, updated: 1, total: 2 });
+    expect(readJson('order-history.json').products.find((p: any) => p.productId === '1').lastOrdered).toBe('2026-06-01');
+  });
+
+  it('skips entries missing productId or product', async () => {
+    rm('order-history.json');
+    const r = await grocery.applyOrderHistory('walmart', [{ productId: '', product: 'x' }, { productId: '9' } as any]);
+    expect(r.total).toBe(0);
+  });
+});
+
 describe('loadCarts', () => {
   it('normalizes agent-written carts that omit items/unmatched arrays', async () => {
     // The /build-carts agent writes carts.json directly and may leave out

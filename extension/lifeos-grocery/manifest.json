@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "LifeOS Grocery Sync",
+  "version": "0.1.0",
+  "description": "Reads your Walmart order history and cart in your own session and syncs them to LifeOS to speed up cart building. Read-only; never places orders.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.walmart.com/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.walmart.com/orders*", "https://www.walmart.com/account/orders*"],
+      "js": ["content-orders.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.walmart.com/cart*", "https://www.walmart.com/checkout*"],
+      "js": ["content-cart.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "action": { "default_title": "LifeOS Grocery Sync", "default_popup": "options.html" },
+  "browser_specific_settings": {
+    "gecko": { "id": "lifeos-grocery-sync@cjay", "strict_min_version": "121.0" }
+  }
+}

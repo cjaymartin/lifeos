@@ -3,9 +3,14 @@ import { createHmac } from 'crypto';
 /** The session cookie's name — owned here; no caller should hardcode it. */
 export const SESSION_COOKIE = 'lifeos_session';
 
-/** Resolve the session secret the same way everywhere (build-time env first). */
+/**
+ * Resolve the session secret. process.env ONLY — never import.meta.env, which
+ * `astro build` inlines into dist/ and would bake a real secret into the build
+ * (NIM-7). The container provides it at runtime via env_file; the test server
+ * sets process.env.SESSION_SECRET to match the cookie it mints.
+ */
 export function getSessionSecret(): string {
-  return (import.meta as any).env?.SESSION_SECRET ?? process.env.SESSION_SECRET ?? '';
+  return process.env.SESSION_SECRET ?? '';
 }
 
 export function makeSessionToken(secret: string): string {
@@ -39,6 +44,26 @@ export function requireSession(cookies: CookieJar): Response | null {
 /** True when the request carries a valid session — for pages that redirect instead of 401. */
 export function hasSession(cookies: CookieJar): boolean {
   return verifySession(cookies.get(SESSION_COOKIE)?.value, getSessionSecret());
+}
+
+/** Bearer token == the session token. Lets non-browser clients (the grocery
+ *  browser extension, which can't send the httpOnly/SameSite-lax cookie
+ *  cross-site) authenticate with `Authorization: Bearer <token>`. */
+export function verifyBearer(authHeader: string | null, secret: string): boolean {
+  if (!authHeader || !secret) return false;
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  return !!m && m[1].trim() === makeSessionToken(secret);
+}
+
+/**
+ * Route guard accepting EITHER a valid session cookie OR a bearer token equal
+ * to the session token. For ingest endpoints the extension posts to.
+ */
+export function requireSessionOrToken(cookies: CookieJar, request: Request): Response | null {
+  const secret = getSessionSecret();
+  if (verifySession(cookies.get(SESSION_COOKIE)?.value, secret)) return null;
+  if (verifyBearer(request.headers.get('authorization'), secret)) return null;
+  return new Response('Unauthorized', { status: 401 });
 }
 
 export function setSession(cookies: { set: Function }, secret: string) {

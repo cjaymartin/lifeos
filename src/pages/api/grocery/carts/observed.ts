@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { requireSession } from '@/lib/auth';
+import { requireSessionOrToken } from '@/lib/auth';
 import { applyObservedCart } from '@/features/grocery/ops';
 import type { Retailer } from '@/features/grocery/types';
 
@@ -14,7 +14,7 @@ const json = (data: unknown, status = 200) =>
  *  absent ⇒ reset to pending. Session-guarded; LifeOS never sees the user's
  *  retailer credentials — only the resulting line items cross localhost. */
 export const POST: APIRoute = async ({ cookies, request }) => {
-  const denied = requireSession(cookies);
+  const denied = requireSessionOrToken(cookies, request);
   if (denied) return denied;
 
   let retailer: Retailer;
