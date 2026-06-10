@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LifeOS Browser Extension",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Bridges your browser session to LifeOS. Today: syncs Walmart order history + cart to speed up grocery cart building (read-only, never places orders). Built to grow into more LifeOS browser integrations over time.",
   "permissions": ["storage"],
   "host_permissions": [
@@ -13,7 +13,10 @@
     "*://127.0.0.1/*"
   ],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
-  "background": { "service_worker": "background.js" },
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
   "content_scripts": [
     {
       "matches": [
