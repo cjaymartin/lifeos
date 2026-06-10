@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Loader2, X, Pencil, Check } from 'lucide-react';
+import { MessageSquare, Send, Loader2, X, Pencil, Check, Trash2 } from 'lucide-react';
+import { chatHistory } from '@/lib/client/chat-history';
 
 interface Proposal {
   summary: string;
@@ -44,6 +45,9 @@ export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitl
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Don't persist until the saved conversation has been restored, or the initial
+  // empty state would overwrite it before it loads.
+  const hydrated = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -58,6 +62,31 @@ export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitl
     const t = setInterval(() => setElapsed(s => s + 1), 1000);
     return () => clearInterval(t);
   }, [loading]);
+
+  // Restore the saved conversation for this stack on mount.
+  useEffect(() => {
+    let cancelled = false;
+    hydrated.current = false;
+    chatHistory.load(stackId).then(saved => {
+      if (cancelled) return;
+      if (saved.length) setMessages(saved);
+    }).catch(err => {
+      // A failed restore must not leave persistence permanently disabled —
+      // flip hydrated anyway so subsequent messages still save.
+      console.error('chat-history: failed to restore conversation', err);
+    }).finally(() => {
+      if (!cancelled) hydrated.current = true;
+    });
+    return () => { cancelled = true; };
+  }, [stackId]);
+
+  // Persist after every change, once restored. Empty state is represented by the
+  // file's absence (see clearChat), so we never write an empty conversation.
+  useEffect(() => {
+    if (!hydrated.current || messages.length === 0) return;
+    chatHistory.save(stackId, messages).catch(err =>
+      console.error('chat-history: failed to persist conversation', err));
+  }, [messages, stackId]);
 
   async function callChat(message: string, history: Message[], approved: boolean) {
     setLoading(true);
@@ -130,6 +159,14 @@ export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitl
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   }
 
+  async function clearChat() {
+    if (loading) return;
+    setMessages([]);
+    await chatHistory.clear(stackId).catch(err =>
+      console.error('chat-history: failed to clear conversation', err));
+    inputRef.current?.focus();
+  }
+
   const suggestions = getSuggestions(stackId);
 
   return (
@@ -153,13 +190,26 @@ export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitl
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30 shrink-0">
           <MessageSquare size={15} className="text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">{stackLabel} Assistant</span>
-          <button
-            onClick={() => setOpen(false)}
-            className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close chat"
-          >
-            <X size={14} />
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {messages.length > 0 && (
+              <button
+                onClick={clearChat}
+                disabled={loading}
+                className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+                aria-label="Clear chat"
+                title="Clear conversation"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+            <button
+              onClick={() => setOpen(false)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Close chat"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
