@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
-import { loadChatHistory, saveChatHistory, clearChatHistory } from '@/lib/chat-history';
+import { loadChatHistory, saveChatHistory, clearChatHistory, isChatMessage } from '@/lib/chat-history';
 import type { ChatMessage } from '@/lib/chat-history';
 
 const json = (data: unknown, status = 200) =>
@@ -32,7 +32,8 @@ export const PUT: APIRoute = async ({ cookies, request }) => {
     return new Response('Bad request', { status: 400 });
   }
   if (badStack(body.stackId)) return new Response('Bad request', { status: 400 });
-  if (!Array.isArray(body.messages)) return new Response('Bad request', { status: 400 });
+  if (!Array.isArray(body.messages) || !body.messages.every(isChatMessage))
+    return new Response('Bad request', { status: 400 });
 
   await saveChatHistory(body.stackId, body.messages as ChatMessage[]);
   return json({ ok: true });

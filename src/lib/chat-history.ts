@@ -20,6 +20,13 @@ export interface ChatMessage {
   proposalStatus?: 'pending' | 'approved' | 'declined';
 }
 
+/** A persisted conversation is only ever user/assistant turns with string content. */
+export function isChatMessage(m: unknown): m is ChatMessage {
+  if (typeof m !== 'object' || m === null) return false;
+  const { role, content } = m as Record<string, unknown>;
+  return (role === 'user' || role === 'assistant') && typeof content === 'string';
+}
+
 /** Where a stack's persisted chat lives, relative to process.cwd(). */
 export function chatHistoryPath(stackId: string): string {
   return join(process.cwd(), 'src/content', stackId, '.chat-history.json');

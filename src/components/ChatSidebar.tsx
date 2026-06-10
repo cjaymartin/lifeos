@@ -70,7 +70,12 @@ export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitl
     chatHistory.load(stackId).then(saved => {
       if (cancelled) return;
       if (saved.length) setMessages(saved);
-      hydrated.current = true;
+    }).catch(err => {
+      // A failed restore must not leave persistence permanently disabled —
+      // flip hydrated anyway so subsequent messages still save.
+      console.error('chat-history: failed to restore conversation', err);
+    }).finally(() => {
+      if (!cancelled) hydrated.current = true;
     });
     return () => { cancelled = true; };
   }, [stackId]);
@@ -79,7 +84,8 @@ export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitl
   // file's absence (see clearChat), so we never write an empty conversation.
   useEffect(() => {
     if (!hydrated.current || messages.length === 0) return;
-    chatHistory.save(stackId, messages);
+    chatHistory.save(stackId, messages).catch(err =>
+      console.error('chat-history: failed to persist conversation', err));
   }, [messages, stackId]);
 
   async function callChat(message: string, history: Message[], approved: boolean) {
@@ -156,7 +162,8 @@ export default function ChatSidebar({ stackId, stackLabel, currentPath, pageTitl
   async function clearChat() {
     if (loading) return;
     setMessages([]);
-    await chatHistory.clear(stackId);
+    await chatHistory.clear(stackId).catch(err =>
+      console.error('chat-history: failed to clear conversation', err));
     inputRef.current?.focus();
   }
 

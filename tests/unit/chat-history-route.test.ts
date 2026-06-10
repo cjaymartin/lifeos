@@ -71,4 +71,11 @@ describe('/api/chat/history', () => {
   it('rejects a PUT whose messages field is not an array', async () => {
     expect((await PUT(bodyCtx({ stackId: 'grocery', messages: 'nope' }))).status).toBe(400);
   });
+
+  it('rejects a PUT whose messages are not well-formed chat turns', async () => {
+    // wrong role, non-string content, and a non-object entry are all refused.
+    expect((await PUT(bodyCtx({ stackId: 'grocery', messages: [{ role: 'system', content: 'x' }] }))).status).toBe(400);
+    expect((await PUT(bodyCtx({ stackId: 'grocery', messages: [{ role: 'user', content: 42 }] }))).status).toBe(400);
+    expect((await PUT(bodyCtx({ stackId: 'grocery', messages: ['nope'] }))).status).toBe(400);
+  });
 });
