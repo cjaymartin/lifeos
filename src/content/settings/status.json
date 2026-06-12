@@ -6,14 +6,14 @@
       "detail": "Token valid — C.Jay "
     },
     "walmart": {
-      "state": "failed",
-      "checkedAt": 1780709361596,
-      "detail": "Browser probe error: browserType.launchPersistentContext: Executable doesn't exist at /home/node/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+      "state": "needs-attention",
+      "checkedAt": 1780788692997,
+      "detail": "Bot-check/2FA wall on account page — use cookie import"
     },
     "amazon": {
       "state": "failed",
-      "checkedAt": 1780709363064,
-      "detail": "Browser probe error: browserType.launchPersistentContext: Executable doesn't exist at /home/node/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝"
+      "checkedAt": 1780788692872,
+      "detail": "Session expired — signed out"
     },
     "gcal": {
       "state": "ok",

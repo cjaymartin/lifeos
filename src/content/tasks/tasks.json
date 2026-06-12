@@ -1,8 +1,8 @@
 {
   "provider": "todoist",
-  "syncToken": "XXLAbjt7QmU1z_Cbz93mp8F9s52LMXxZh3YFDI5aEV3XatAsHalYjzo-FCcNoSAsqRjchzKL14H1EdrCzKTYxmMhEAZ6YeY1I3wpaSoPEFz09rwk",
-  "lastSyncAt": "2026-06-06T13:03:26.763Z",
-  "version": 5217,
+  "syncToken": "BYGyX6WzL-ZBNqB0XpeuT9JGeU_mlD0wGFD3N8WAtRGNwi2acIiNBMilI7EDShG3f3ziGv7qmL6AxLGd2z0aN_RFtE5-mbzQiEyvJFZ3yTY5zawo",
+  "lastSyncAt": "2026-06-12T17:24:20.285Z",
+  "version": 20180,
   "tasks": [
     {
       "id": "6fxpWRM52Jv6Rq66",
@@ -15,7 +15,7 @@
       "priority": 2,
       "labels": [],
       "due": {
-        "date": "2026-06-06",
+        "date": "2026-06-12",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -36,7 +36,7 @@
       "priority": 2,
       "labels": [],
       "due": {
-        "date": "2026-06-06",
+        "date": "2026-06-12",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -57,7 +57,7 @@
       "priority": 2,
       "labels": [],
       "due": {
-        "date": "2026-06-06T19:00:00",
+        "date": "2026-06-12T19:00:00",
         "hasTime": true,
         "timezone": null,
         "recurring": true,
@@ -78,7 +78,7 @@
       "priority": 4,
       "labels": [],
       "due": {
-        "date": "2026-06-08",
+        "date": "2026-06-15",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -99,7 +99,7 @@
       "priority": 4,
       "labels": [],
       "due": {
-        "date": "2026-06-06",
+        "date": "2026-06-13",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -120,7 +120,7 @@
       "priority": 4,
       "labels": [],
       "due": {
-        "date": "2026-06-06",
+        "date": "2026-06-13",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -141,7 +141,7 @@
       "priority": 4,
       "labels": [],
       "due": {
-        "date": "2026-06-08",
+        "date": "2026-06-15",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -162,7 +162,7 @@
       "priority": 1,
       "labels": [],
       "due": {
-        "date": "2026-06-06",
+        "date": "2026-06-12",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
@@ -183,11 +183,11 @@
       "priority": 1,
       "labels": [],
       "due": {
-        "date": "2026-06-07",
+        "date": "2026-06-14",
         "hasTime": false,
         "timezone": null,
         "recurring": true,
-        "string": "every day"
+        "string": "every sunday"
       },
       "deadline": null,
       "duration": null,
@@ -213,6 +213,48 @@
       "deadline": null,
       "duration": null,
       "addedAt": "2026-04-23T11:49:48.532363Z"
+    },
+    {
+      "id": "6gqfFvFqGpr3pm6H",
+      "content": "Pay off 3272",
+      "description": "",
+      "projectId": "6Crg2x2WhW6FrH7H",
+      "sectionId": null,
+      "parentId": null,
+      "order": 14,
+      "priority": 4,
+      "labels": [],
+      "due": {
+        "date": "2026-06-26",
+        "hasTime": false,
+        "timezone": null,
+        "recurring": true,
+        "string": "every 26th"
+      },
+      "deadline": null,
+      "duration": null,
+      "addedAt": "2026-06-10T12:25:58.440697Z"
+    },
+    {
+      "id": "6gqfFv9V5Vx3gMXH",
+      "content": "Pay off Norwegian",
+      "description": "",
+      "projectId": "6Crg2x2WhW6FrH7H",
+      "sectionId": null,
+      "parentId": null,
+      "order": 15,
+      "priority": 4,
+      "labels": [],
+      "due": {
+        "date": "2026-07-03",
+        "hasTime": false,
+        "timezone": null,
+        "recurring": true,
+        "string": "every 3rd"
+      },
+      "deadline": null,
+      "duration": null,
+      "addedAt": "2026-06-10T12:25:58.966602Z"
     }
   ],
   "projects": [

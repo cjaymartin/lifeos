@@ -1,0 +1,580 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Groceries Refactor — Technical Design</title><style>
+:root{--fg:#1f2328;--muted:#656d76;--accent:#1f6feb;--border:#d0d7de;--bg:#fff;--code:#f6f8fa;}
+*{box-sizing:border-box;} body{margin:0;background:#eaeef2;color:var(--fg);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
+.page{max-width:880px;margin:32px auto;background:var(--bg);padding:56px 64px;border:1px solid var(--border);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+h1{font-size:2em;border-bottom:2px solid var(--border);padding-bottom:.3em;margin-top:0;} h2{font-size:1.5em;border-bottom:1px solid var(--border);padding-bottom:.3em;margin-top:1.8em;} h3{font-size:1.2em;margin-top:1.5em;}
+a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
+code{background:var(--code);padding:.15em .4em;border-radius:5px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+pre{background:var(--code);padding:14px 16px;border-radius:8px;overflow:auto;} pre code{background:none;padding:0;}
+table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.94em;} th,td{border:1px solid var(--border);padding:7px 11px;text-align:left;vertical-align:top;} th{background:var(--code);} tr:nth-child(even) td{background:#fafbfc;}
+blockquote{margin:1em 0;padding:.4em 1em;color:var(--muted);border-left:4px solid var(--border);background:#f6f8fa;border-radius:0 6px 6px 0;}
+hr{border:none;border-top:1px solid var(--border);margin:2em 0;} li{margin:.25em 0;}
+@media print{body{background:#fff;}.page{border:none;box-shadow:none;margin:0;max-width:none;}}
+</style></head><body><div class="page"><h1 id="technical-design-groceries-page-refactor">Technical Design — Groceries Page Refactor</h1>
+<ul>
+<li><strong>Product:</strong> LifeOS Groceries feature (<code>src/features/grocery/</code>)</li>
+<li><strong>Author:</strong> Architect (Step 2 of 5)</li>
+<li><strong>Date:</strong> 2026-06-09</li>
+<li><strong>Inputs:</strong> <a href="./BRD.md"><code>BRD.md</code></a> (Step 1) — goals G1–G5, FR-x.x, NFRs, SC-1…6, and the 6 open questions</li>
+<li><strong>Status:</strong> Draft for implementation hand-off (Steps 3–5)</li>
+<li><strong>Audience:</strong> Implementers; the <code>to-issues</code> step that will slice this into tickets</li>
+</ul>
+<blockquote>
+<p>This document turns the BRD's <em>what</em> into a concrete <em>how</em>, grounded in the
+actual code. It answers the BRD's open questions, defines additive data-model
+changes, names the modules/functions/endpoints that change, and proposes a
+vertical-slice delivery plan. It does <strong>not</strong> write the code.</p>
+</blockquote>
+<hr />
+<h2 id="1-the-core-architectural-problem">1. The core architectural problem</h2>
+<p>Everything the user called "out of sync with Walmart" traces to <strong>one fact</strong>:</p>
+<blockquote>
+<p>The Walmart bulk add-to-cart link (<code>affil.walmart.com/cart/addToCart?items=…</code>,
+built in <code>buildAddToCartUrl</code>, <code>types.ts:147</code>) is <strong>fire-and-forget</strong>. LifeOS
+opens it in a new tab; the user lands on Walmart; LifeOS gets <strong>zero feedback</strong>
+about what actually landed in the real cart. The hard rule forbids logging in
+or reading the user's Walmart cart server-side, so we can <strong>never observe</strong> the
+true cart state.</p>
+</blockquote>
+<p>Today the code papers over this with an <strong>optimistic, all-or-nothing guess</strong>:
+clicking "Add to cart" fires the link and, after a 300 ms deferral hack
+(<code>GroceryApp.tsx:928</code>, documented at <code>:597</code>), blanket-sets <code>addedQty = qty</code> on
+<em>every</em> pending line (<code>carts.ts:34</code>, <code>setCartAdded</code>). "In cart" is therefore a
+<strong>guess, not truth</strong> — and when a product is wrong, out of stock, or only
+partially added, the guess is wrong, which is exactly the user's pain.</p>
+<p><strong>Design stance:</strong> we cannot observe the real cart, so we <strong>make the guess
+honest</strong> by adding one lightweight, user-driven reconciliation interaction after
+the handoff, and we <strong>stop silently dropping</strong> items at build time so the user
+always sees the full truth of what matched, what substituted, and what didn't.
+This is the spine of the refactor; G2/G3/G4/G5 hang off it.</p>
+<hr />
+<h2 id="2-answers-to-the-brds-open-questions">2. Answers to the BRD's open questions</h2>
+<p>These are the binding design decisions. Sections 4–6 detail each.</p>
+<p><strong>Q1 — Walmart "what landed" fidelity (FR-1.2/1.3).</strong>
+We <strong>can</strong> observe the real cart — but only from the user's <em>own</em> interactive,
+logged-in session, never by server-side automation (which Walmart's bot defense
+blocks; see §4.6). Two layers:
+- <strong>Baseline (always works):</strong> after the user follows the add-to-cart link,
+  LifeOS shows a <strong>per-line reconciliation panel</strong> — "You sent N items to
+  Walmart — uncheck anything that didn't make it." This converts the optimistic
+  blanket <code>addedQty</code> into <strong>per-line truth</strong> with one interaction, replaces the
+  all-or-nothing <code>mark-added</code>/<code>reset-added</code>, and lets us delete the 300 ms
+  deferral hack.
+- <strong>Upgrade (§4.6):</strong> a <strong>bookmarklet</strong> (later, a browser extension) reads the
+  real cart DOM in the user's session and <strong>auto-fills</strong> that panel — confirmed
+  vs. didn't-land becomes a glance, not a chore.
+Confirmed lines set <code>addedQty = qty</code> (so the next build excludes them → no
+duplicate re-adds); unconfirmed lines stay buildable. The bookmarklet is a strict
+upgrade <em>on top of</em> reconciliation, not a replacement — manual reconcile is the
+fallback when it isn't used.</p>
+<p><strong>Q2 — Out-of-stock detection + fallbacks (FR-2.x).</strong>
+The <code>build-carts</code> agent already fetches and checks the product page for "out of
+stock / unavailable" on every <code>source:"new"</code> match (SKILL.md Step 2 "Verify on
+the product page"). Today it <strong>discards</strong> a dead match. We change it to <strong>capture
+2–3 alternative candidate products</strong> instead of discarding, and to emit a
+per-line <code>status</code>. The agent may pre-select the closest alternative
+(<code>substituted: true</code>) so the cart stays usable; the UI shows the alternatives
+inline for the user to confirm/override. Stock-checking remains best-effort
+(bot-gated pages cap confidence at <code>medium</code>, as today).</p>
+<p><strong>Q3 — Where substitutions / pins / default-qty live (FR-2.4/3.x).</strong>
+- <strong>Substitution memory:</strong> accepting a substitute writes a <strong>learned</strong> (<code>pinned:
+  false</code>) entry into <code>product-map.json</code> under the item's normalized name — the
+  existing instant-resolution path (<code>assembleCarts</code>, <code>ops.ts:257</code>) then reorders
+  it for free next time. A learned entry <strong>never overwrites a <code>pinned: true</code></strong>
+  one; if a pinned product is out of stock we keep the pin and attach a
+  transient <code>substitute</code> on the cart line only (the pin may restock).
+- <strong>Pins:</strong> unchanged storage (<code>product-map.json</code>, <code>pinned:true</code>), but pinning
+  becomes one-click <strong>from a cart line</strong> (Section 6.3) in addition to URL paste.
+- <strong>Default quantity:</strong> new optional <code>defaultQty?: number</code> on <code>GroceryItem</code> and
+  <code>Staple</code> (Section 3). No new file; both already exist.
+- We avoid the "near-duplicate keys" accretion the BRD flagged by <strong>always
+  keying on <code>normalizeName(item.name)</code></strong> (already the convention) and by writing
+  learned entries only on <em>confirmed</em> outcomes (checkout/substitute-accept),
+  not on every speculative match.</p>
+<p><strong>Q4 — Categorization approach (FR-4.x).</strong>
+Three additive layers, cheapest first, <strong>no new blocking latency</strong>:
+1. A <strong>learned category map</strong> (<code>category-map.json</code>, normalizedName → category)
+   consulted <em>before</em> the keyword heuristic. Written whenever the user overrides
+   a category or the categorize agent confirms one. This is the durable fix —
+   user overrides stick (FR-4.2) and the agent's good answers persist.
+2. <strong>Expanded keyword lists</strong> in <code>categorizeHeuristic</code> (<code>ops.ts:117</code>) to cover
+   today's misses (paper plates/bowls/cups, napkins, cutlery; psyllium/fiber/
+   supplement; common meds) — pure data, instant.
+3. The existing <strong>async categorize agent</strong> as the final fallback for genuinely
+   unknown items — unchanged mechanism, now writes to the learned map so it only
+   ever has to decide a given name once.
+   We also route <code>addStaple</code> through the same resolver so staples stop seeding as
+   "Other" (the root cause of milk/ibuprofen/psyllium sitting in "Other").</p>
+<p><strong>Q5 — Unavailability email parsing (FR-5.x).</strong>
+Extend the <code>grocery-purchase-scan</code> agent to additionally match Walmart emails
+signalling <strong>item unavailable / refunded / "we couldn't fulfill" / out of stock</strong>
+(subjects/snippets like <em>"items were unavailable", "refund", "out of stock",
+"changes to your order", "item(s) not available"</em>). It already reads order
+emails; we widen the query and add an <code>unavailable: [...]</code> array to
+<code>.scan-results.json</code>, <strong>tied back to the original <code>orderId</code></strong> so the server
+re-adds exactly the right item. The server (<code>loadGroceryState</code>, <code>ops.ts:154</code>)
+applies it: re-add the item to the list, mark its <code>purchases.json</code> record
+<code>refunded: true</code>, and <strong>do not</strong> keep a <code>lastPurchased</code> for the unfulfilled item
+(set the matching staple back to <code>out</code>).</p>
+<p><strong>Q6 — Stretch: live cart total (FR-1.6).</strong>
+<strong>Include it, cheaply.</strong> The agent already records <code>price</code> per line. LifeOS sums
+the matched lines' prices and shows an <strong>estimated cart total</strong> on the cart card,
+clearly labelled "estimated, before tax &amp; fees." No new fetching; if some lines
+lack a price, show "≥ $X (N items unpriced)". Purely additive, low risk.</p>
+<hr />
+<h2 id="3-data-model-changes-all-additive-back-compatible-nfr-6-fr-64">3. Data model changes (all additive &amp; back-compatible — NFR-6 / FR-6.4)</h2>
+<p>No existing field changes meaning; every new field is optional, so current JSON
+keeps validating and old files load unchanged.</p>
+<h3 id="31-typests">3.1 <code>types.ts</code></h3>
+<pre><code class="language-ts">// GroceryItem — add:
+defaultQty?: number;        // preferred purchase count; overrides parsed quantity at build
+
+// Staple — add:
+defaultQty?: number;        // carried onto the list item when the staple auto-re-adds
+
+// CartMatch — add:
+status?: 'ok' | 'out_of_stock' | 'unavailable';   // default 'ok' when absent
+alternatives?: ProductCandidate[];                 // ranked fallbacks the agent found
+substituted?: boolean;      // agent auto-picked an alternative; UI flags it
+// (addedQty stays, but is now set per-line by reconciliation, not blanket)
+
+// PurchaseRecord — add:
+refunded?: boolean;         // set when a later unavailability email reverses a purchase
+
+// new:
+export interface ProductCandidate {
+  productId: string;
+  product: string;
+  price?: string;
+  productUrl?: string;
+  size?: string;            // free-form, for the &quot;pick a size&quot; decision
+}
+</code></pre>
+<h3 id="32-new-content-file-srccontentgrocerycategory-mapjson">3.2 New content file — <code>src/content/grocery/category-map.json</code></h3>
+<pre><code class="language-jsonc">{ &quot;psyllium fiber&quot;: &quot;Personal Care&quot;, &quot;paper plates&quot;: &quot;Household&quot; }  // normalizedName → category
+</code></pre>
+<p>Consulted before the keyword heuristic; written on user override and on
+categorize-agent confirmation. Mirrors the <code>product-map.json</code> pattern (learned
+memory keyed by normalized name). Loaders/savers in <code>ops.ts</code>.</p>
+<h3 id="33-scan-resultsjson-agent-output-extended-shape">3.3 <code>.scan-results.json</code> (agent output) — extended shape</h3>
+<pre><code class="language-jsonc">{
+  &quot;purchases&quot;:   [ /* unchanged: confirmed buys to remove + restock */ ],
+  &quot;unavailable&quot;: [ { &quot;name&quot;: &quot;...&quot;, &quot;orderId&quot;: &quot;...&quot;, &quot;date&quot;: &quot;...&quot;, &quot;matchedItemIds&quot;: [&quot;...&quot;] } ]
+}
+</code></pre>
+<p><code>GroceryState</code> (the GET payload) is unchanged in shape — these are transient
+agent files reconciled server-side.</p>
+<hr />
+<h2 id="4-goal-by-goal-design">4. Goal-by-goal design</h2>
+<h3 id="g1-reliable-cart-walmart-handoff-fr-1116">G1 — Reliable cart ↔ Walmart handoff  (FR-1.1–1.6)</h3>
+<p><strong>Build (unchanged spine, hardened).</strong> <code>assembleCarts</code> (<code>ops.ts:235</code>) still
+resolves known items instantly from <code>product-map</code> and queues unknowns to
+<code>cart-request.json</code> for the agent. Hardening:
+- <strong>FR-1.5 concurrency:</strong> <code>build-carts.ts</code> checks <code>isJobRunning('build-carts')</code>
+  and returns <code>{status:'running'}</code> instead of spawning a second agent; the UI
+  disables "Build Carts" while <code>buildState === 'loading'</code> (state already exists).</p>
+<p><strong>Handoff + reconciliation (the core change).</strong>
+- The cart card keeps the bulk add-to-cart <code>&lt;a href&gt;</code> (real one-link add, FR-1.1).
+- Replace the optimistic blanket <code>setCartAdded(...true)</code> on click. Instead, when
+  the user returns to the tab (or clicks "I sent these"), show a <strong>reconciliation
+  panel</strong> listing the pushed lines, each checked by default. The user unchecks
+  any that didn't land. Submitting:
+  - checked → <code>addedQty = qty</code> (server, per line);
+  - unchecked → <code>addedQty</code> cleared, line stays buildable.
+- <strong>FR-1.2 (know what landed):</strong> the cart card now shows three line states —
+  <em>in cart</em> (green, <code>addedQty ≥ qty</code>), <em>pending</em>, <em>needs attention</em> (out of
+  stock / unmatched). This is real per-line truth, not a guess.
+- <strong>FR-1.3 (no duplicate re-adds):</strong> <code>assembleCarts</code> already excludes
+  <code>addedQty ≥ qty</code> lines (<code>ops.ts:241</code>); per-line reconciliation makes that
+  exclusion <em>accurate</em>, so rebuild/return never re-adds a confirmed line.
+- <strong>FR-1.4 (resilient handoff):</strong> because reconciliation is explicit, a bot-check
+  or partial add is just "uncheck the ones that failed" — no lost state, and the
+  fragile 300 ms deferral hack (<code>:928</code>) is removed.
+- <strong>FR-1.6 (estimated total):</strong> sum line <code>price</code>s on the card (Section 2/Q6).
+- <strong>Confirmed-purchase learning (feeds G3):</strong> on checkout/reconcile, persist each
+  confirmed line's <code>productId</code> into <code>product-map.json</code> as a learned entry
+  (never overwriting a pin). This closes the loop so the next reorder locks onto
+  the product the user actually bought.</p>
+<p><strong>Endpoints:</strong> repurpose <code>POST /api/grocery/carts</code> to accept
+<code>{ retailer, addedItemIds: string[] }</code> (per-line) alongside the legacy
+<code>mark-added</code>/<code>reset-added</code> (kept for back-compat during migration).</p>
+<h3 id="g2-interactive-out-of-stock-flow-fr-2124">G2 — Interactive out-of-stock flow  (FR-2.1–2.4)</h3>
+<p><strong>Agent (<code>build-carts</code> SKILL.md).</strong> When the verify step finds the chosen product
+out of stock/unavailable:
+- do <strong>not</strong> discard silently (FR-2.1);
+- collect <strong>2–3 ranked alternatives</strong> from the same search results (same-container
+  rule already in the skill) → <code>alternatives: ProductCandidate[]</code>;
+- emit <code>status:'out_of_stock'</code>; optionally pre-select the closest alternative as
+  the line's product with <code>substituted:true</code> (FR-2.3);
+- never invent a match — if no alternative is plausible, leave the line with
+  <code>status:'out_of_stock'</code> and empty <code>alternatives</code> (it shows as "needs attention",
+  not dropped).</p>
+<p><strong>UI (<code>GroceryApp.tsx</code> cart line).</strong> A line with <code>status:'out_of_stock'</code> renders
+an inline <strong>"Out of stock — pick a substitute"</strong> control listing the
+<code>alternatives</code> (title · size · price) plus "keep waiting / remove". Picking one:
+- updates the line's <code>productId/product/price</code> and rebuilds <code>cartUrl</code>;
+- writes a <strong>learned <code>product-map</code> entry</strong> for that item name (FR-2.4 — remembered
+  next time), respecting pins per Q3;
+- a <code>substituted:true</code> line shows a clear "substituted" badge the user can change.</p>
+<p><strong>Endpoint:</strong> <code>POST /api/grocery/carts/substitute</code>
+<code>{ retailer, itemId, productId }</code> (chosen from <code>alternatives</code>) → update line +
+learn product. (Or fold into the existing <code>carts</code> PATCH.)</p>
+<h3 id="g3-trustworthy-product-locking-fr-3135">G3 — Trustworthy product locking  (FR-3.1–3.5)</h3>
+<ul>
+<li><strong>FR-3.1 / 3.5 easy pinning:</strong> add a one-click <strong>"Always use this"</strong> on every
+  cart line (pins the line's <code>productId</code> → <code>product-map</code>, <code>pinned:true</code>) and a
+  <strong>"wrong product?"</strong> affordance that reuses the G2 alternatives picker. URL-paste
+  pinning (<code>product-map.ts</code> POST, <code>ItemSettings</code> cog) stays for power use.</li>
+<li><strong>FR-3.2 pins sacred:</strong> unchanged guarantee — agent skill Step 4 and the
+  learned-write paths must never overwrite <code>pinned:true</code> (already enforced;
+  add a unit test as a regression guard).</li>
+<li><strong>FR-3.3 prefer last-bought:</strong> the confirmed-purchase learning in G1 means a
+  real purchase becomes a learned product-map entry, so the next build reorders
+  the exact product instead of re-guessing. Agent priority order is unchanged.</li>
+<li><strong>FR-3.4 default quantity:</strong> new <code>defaultQty</code> (Section 3). <code>assembleCarts</code>
+  computes <code>qty = item.defaultQty ?? countQty(item.quantity)</code> (<code>ops.ts:210</code>).
+  Editable from the item settings cog; carried staple→list in <code>syncStapleToList</code>
+  (<code>ops.ts:337</code>).</li>
+</ul>
+<h3 id="g4-smarter-categorization-fr-4143">G4 — Smarter categorization  (FR-4.1–4.3)</h3>
+<ul>
+<li><strong>Resolver order</strong> in a new <code>resolveCategory(name)</code>: <code>category-map.json</code> hit →
+  <code>categorizeHeuristic</code> keyword hit → <code>['Other', false]</code> (agent fallback). Used
+  by item-add (<code>/api/grocery</code> POST) <strong>and</strong> <code>addStaple</code> (fixes "Other" staples).</li>
+<li><strong>FR-4.1 expanded keywords:</strong> add to <code>KEYWORD_CATEGORIES</code> (<code>ops.ts:117</code>):
+  Household — <code>plate, bowl, cup, napkin, cutlery, fork, spoon, knife, paper plate</code>;
+  Personal Care — <code>psyllium, fiber, supplement, probiotic, antacid, ibuprofen</code>
+  (note: real data has a misspelling "Ibuprofin" — learned map covers
+  misspellings the heuristic can't).</li>
+<li><strong>FR-4.2 overrides persist:</strong> setting a category in the UI writes
+  <code>category-map.json[normalizeName(name)] = category</code>. Future adds of that name
+  resolve instantly and correctly. The categorize agent also writes the map on
+  confirm, so each name is decided once.</li>
+<li><strong>FR-4.3 non-blocking:</strong> map + heuristic are synchronous; only true unknowns
+  hit the async agent (mechanism unchanged, <code>jobs.ts</code> <code>categorize</code>).</li>
+<li><strong>One-time data cleanup:</strong> a small migration runs <code>resolveCategory</code> over the
+  current 22 staples to re-file the existing "Other" entries (milk → Dairy,
+  paper plates/bowls → Household, etc.).</li>
+</ul>
+<h3 id="g5-catch-post-order-unavailability-fr-5154">G5 — Catch post-order unavailability  (FR-5.1–5.4)</h3>
+<ul>
+<li><strong>Agent (<code>grocery-purchase-scan</code> SKILL.md):</strong> widen the Gmail query to include
+  unavailability/refund signals; emit <code>unavailable: [...]</code> keyed by <code>orderId</code>
+  (Section 3.3). Keep order-confirmation handling as-is.</li>
+<li><strong>Server (<code>loadGroceryState</code>, <code>ops.ts:176</code>):</strong> after applying <code>purchases</code>,
+  apply <code>unavailable</code>:</li>
+<li><strong>FR-5.2</strong> re-add the item to <code>grocery.items</code> (<code>source:'scan'</code>, a note like
+    "Walmart: unavailable — reorder") if not already present;</li>
+<li><strong>FR-5.1/5.4</strong> if a <code>purchases.json</code> record matches the <code>orderId</code>+name, set
+    <code>refunded:true</code> on it (honest history);</li>
+<li><strong>FR-5.3</strong> if a matching staple was restocked by that order, set it back to
+    <code>out</code> and clear/skip the <code>lastPurchased</code> for the unfulfilled item.</li>
+<li><strong>Ordering note:</strong> confirmation and unavailability can arrive in the same scan;
+  apply <code>purchases</code> first, then <code>unavailable</code>, so a refunded item ends net
+  back-on-list.</li>
+</ul>
+<h3 id="g1-real-cart-capture-bookmarklet-extension-upgrades-fr-1213">G1+ — Real-cart capture: bookmarklet → extension  (upgrades FR-1.2/1.3)</h3>
+<p><strong>Why not server-side.</strong> The <code>build-carts</code> agent runs <strong>headless in the Docker
+container</strong>; Walmart sits behind HUMAN/PerimeterX + Akamai fingerprinting that is
+purpose-built to block automated/headless browsers (the skill already caps
+confidence to <code>medium</code> on bot-gated pages). A server-side cart scrape would be the
+flakiest "source of truth" in the system. The key insight: <strong>automation gets
+blocked, the user does not</strong> — so we read the cart from <em>inside the user's own
+interactive, already-logged-in session</em> and ferry the data to LifeOS on localhost.</p>
+<p><strong>Hard-rule stance.</strong> Reading your <em>own</em> already-authenticated cart is
+<strong>observation, not a transaction</strong> — it does not log in, pay, or check out, so it
+sits within the absolute rule (which forbids LifeOS <em>acting</em> on the user's
+behalf). The bookmarklet/extension variants keep <strong>credentials entirely out of
+LifeOS</strong>: it never sees a password or session cookie, only the resulting line
+items. This is the deciding reason to prefer them over a Playwright-with-profile
+or cookie-replay approach (both of which would put the user's Walmart session
+inside LifeOS and still fight bot detection).</p>
+<p><strong>Phase 1 — Bookmarklet (this refactor).</strong>
+- A small JS bookmarklet the user keeps in their bookmarks bar. While on
+  <code>walmart.com/cart</code>, they click it; it reads the rendered cart line items
+  (product title, productId from the <code>/ip/&lt;id&gt;</code> links, qty, price) from the DOM
+  and <code>POST</code>s them to a LifeOS localhost endpoint.
+- <strong>Ingest endpoint:</strong> <code>POST /api/grocery/carts/observed</code>
+  <code>{ retailer:'walmart', items:[{ productId, product?, qty?, price? }] }</code>.
+  Server matches observed <code>productId</code>s against the current Walmart cart's
+  <code>CartMatch</code> lines and sets <code>addedQty</code> accordingly — <strong>present ⇒ <code>addedQty =
+  observed qty</code>; absent ⇒ <code>addedQty</code> cleared (didn't land)</strong>. Unknown productIds
+  in the cart are surfaced as "also in your cart (not from this list)" info only.
+- <strong>Parser:</strong> a tolerant DOM scrape (Walmart markup shifts), keyed on the stable
+  <code>/ip/&lt;itemId&gt;</code> pattern already parsed by <code>parseProductUrl</code> (<code>ops.ts:75</code>); if the
+  page layout defeats it, the bookmarklet posts nothing and the user falls back to
+  manual reconciliation — no silent wrong state.
+- <strong>CORS/security:</strong> endpoint is localhost-only and behind the existing
+  <code>requireSession</code> guard; accept only the two retailer hosts' shape. Because the
+  bookmarklet runs in the user's tab, no Walmart auth crosses into LifeOS.
+- <strong>Result:</strong> the reconciliation panel (G1) opens <strong>pre-filled</strong> — green =
+  confirmed in cart, struck-through = didn't make it — so the user glances and
+  confirms instead of hand-unchecking.</p>
+<p><strong>Phase 2 — Browser extension (follow-up, tracked not built here).</strong>
+Same ingest contract, but an installed extension reads the cart automatically
+(e.g. on cart-page load or a toolbar click) and posts to LifeOS, removing the
+manual bookmarklet click. Deferred to keep this refactor shippable; filed as a
+follow-up issue. The <code>observed</code> endpoint is designed so the extension needs <strong>no
+server changes</strong> — only a nicer client.</p>
+<hr />
+<h2 id="5-module-boundary-map-what-changes-where">5. Module / boundary map (what changes where)</h2>
+<p>The refactor stays entirely within the existing Feature; <strong>no new feature, no
+cross-feature coupling</strong>. Shared deep modules (<code>src/lib/jobs/runner</code>, auth,
+stack-client) are untouched.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Types/constants</td>
+<td><code>src/features/grocery/types.ts</code></td>
+<td>+ <code>defaultQty</code>, <code>CartMatch.status/alternatives/substituted</code>, <code>ProductCandidate</code>, <code>PurchaseRecord.refunded</code></td>
+</tr>
+<tr>
+<td>Server ops</td>
+<td><code>src/features/grocery/ops.ts</code></td>
+<td>category-map load/save + <code>resolveCategory</code>; <code>assembleCarts</code> qty + concurrency; new <code>reconcileCartAdds</code>/<code>acceptSubstitute</code>; confirmed-purchase product learning in <code>checkoutItems</code>; <code>unavailable</code> handling in <code>loadGroceryState</code>; staple re-file migration</td>
+</tr>
+<tr>
+<td>Agent jobs</td>
+<td><code>src/features/grocery/jobs.ts</code></td>
+<td>no mechanism change (allowedTools already cover Gmail/web/writes)</td>
+</tr>
+<tr>
+<td>Skills</td>
+<td><code>.claude/skills/build-carts/SKILL.md</code></td>
+<td>out-of-stock → capture alternatives + <code>status</code>; keep merge rules</td>
+</tr>
+<tr>
+<td>Skills</td>
+<td><code>.claude/skills/grocery-purchase-scan/SKILL.md</code></td>
+<td>detect unavailability/refunds → <code>unavailable[]</code></td>
+</tr>
+<tr>
+<td>Browser client</td>
+<td><code>src/features/grocery/client.ts</code></td>
+<td>+ <code>reconcileCart</code>, <code>acceptSubstitute</code>, <code>pinFromLine</code>, <code>setCategory</code>, <code>setDefaultQty</code></td>
+</tr>
+<tr>
+<td>API routes</td>
+<td><code>src/pages/api/grocery/carts.ts</code></td>
+<td>per-line <code>addedItemIds</code> reconcile; substitute action</td>
+</tr>
+<tr>
+<td>API routes</td>
+<td><code>src/pages/api/grocery/items/[id].ts</code></td>
+<td>accept <code>category</code> (→ learned map) + <code>defaultQty</code> patches</td>
+</tr>
+<tr>
+<td>API routes</td>
+<td><code>src/pages/api/grocery/product-map.ts</code></td>
+<td>optional: pin-from-line by <code>productId</code> (not just URL)</td>
+</tr>
+<tr>
+<td>API routes</td>
+<td><code>src/pages/api/grocery/carts/observed.ts</code> <em>(new)</em></td>
+<td>ingest real-cart line items from the bookmarklet/extension → set per-line <code>addedQty</code></td>
+</tr>
+<tr>
+<td>Asset</td>
+<td>bookmarklet (a <code>dev/</code> page or settings snippet) <em>(new)</em></td>
+<td>JS that scrapes <code>walmart.com/cart</code> DOM in the user's session and POSTs to <code>/observed</code></td>
+</tr>
+<tr>
+<td>UI</td>
+<td><code>src/components/grocery/GroceryApp.tsx</code></td>
+<td>reconciliation panel (auto-fillable from <code>observed</code>); out-of-stock substitution control; one-click pin/"wrong product"; estimated total; remove 300 ms hack; category override persistence</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Hard-rule guard (FR-6.3):</strong> every new flow still only <em>builds links</em>; no new
+write path logs in, pays, or checks out. The reconciliation panel is explicitly
+"the user tells us what they already did," never an automated purchase.</p>
+<hr />
+<h2 id="6-cross-cutting-concerns">6. Cross-cutting concerns</h2>
+<ul>
+<li><strong>Atomicity / mid-write reads (NFR-1).</strong> New writes (<code>category-map.json</code>,
+  learned product-map updates, reconcile) use the existing <code>writeJson</code>
+  (<code>ops.ts:31</code>). Note the repo's known "tolerate mid-write reads" pattern
+  (e.g. deliveries e2e); keep all multi-file mutations server-side inside the
+  single <code>loadGroceryState</code> reconcile pass so the UI never observes a torn state.</li>
+<li><strong>Migration / back-compat (NFR-6).</strong> Missing <code>status</code> ⇒ <code>'ok'</code>; missing
+  <code>defaultQty</code> ⇒ <code>countQty</code>; missing <code>category-map.json</code> ⇒ <code>{}</code>. Old <code>carts.json</code>
+  with blanket <code>addedQty</code> still renders. The staple re-file migration is
+  idempotent (only touches <code>category === 'Other'</code>).</li>
+<li><strong>Transparency / undo (NFR-4).</strong> Auto-substitution is <em>flagged</em>, not silent;
+  scan removals and unavailability re-adds remain visible list changes; the
+  reconciliation panel is itself the "what changed" surface.</li>
+<li><strong>Testability (NFR-7).</strong> Unit tests: <code>resolveCategory</code> precedence, learned-map
+  write on override, <code>assembleCarts</code> qty + concurrency guard, pin-never-overwritten,
+  <code>unavailable</code> re-add + staple reset, confirmed-purchase learning. E2e
+  (sandboxed, agents shimmed): full build → reconcile → no-duplicate rebuild;
+  out-of-stock → substitute → remembered; category override persists across add.
+  Run <code>npm test</code> + <code>npm run test:e2e</code>; <code>npm run build</code> after structural changes.</li>
+</ul>
+<hr />
+<h2 id="7-proposed-delivery-slices-for-the-to-issues-step">7. Proposed delivery slices (for the <code>to-issues</code> step)</h2>
+<p>Tracer-bullet vertical slices, ordered so each ships value and de-risks the next.
+Each slice touches data + ops + API + UI (+ agent/skill where noted) end-to-end.</p>
+<ol>
+<li><strong>S1 — Honest handoff &amp; reconciliation (G1 core).</strong> Per-line <code>addedItemIds</code>
+   reconcile, three-state cart line, estimated total, remove deferral hack,
+   concurrency guard. <em>Delivers SC-1.</em> Highest priority; unblocks accurate
+   "in cart" for everything else.</li>
+<li><strong>S2 — Confirmed-purchase product learning + default qty (G3).</strong> Learn
+   <code>productId</code> on checkout/reconcile; <code>defaultQty</code> on item/staple. Small, makes
+   reorders lock in. <em>Delivers SC-3 (partial).</em></li>
+<li><strong>S3 — Out-of-stock alternatives (G2).</strong> Agent captures <code>alternatives</code> +
+   <code>status</code>; inline substitution UI; remember substitute. <em>Delivers SC-2.</em>
+   (Agent/skill + UI; depends on S1's line states.)</li>
+<li><strong>S4 — One-click product locking (G3 UX).</strong> "Always use this" / "wrong
+   product?" from a cart line, reusing S3's picker. <em>Completes SC-3.</em></li>
+<li><strong>S5 — Smarter categorization (G4).</strong> <code>category-map.json</code> + <code>resolveCategory</code>,
+   expanded keywords, override persistence, staple re-file migration.
+   <em>Delivers SC-4.</em> Independent of S1–S4; can run in parallel.</li>
+<li><strong>S6 — Unavailability emails (G5).</strong> Scan agent <code>unavailable[]</code> + server
+   re-add/refund/staple-reset. <em>Delivers SC-5.</em> Independent; can run in parallel.</li>
+<li><strong>S7 — Real-cart capture bookmarklet (G1+).</strong> <code>POST /carts/observed</code> ingest +
+   DOM-scraping bookmarklet that auto-fills the reconciliation panel. <em>Upgrades
+   SC-1.</em> Depends on S1 (needs the per-line <code>addedQty</code> model + reconcile panel).
+   The browser <strong>extension</strong> is a tracked follow-up (same <code>observed</code> contract,
+   no server change) — filed as a new issue, not built in this refactor.</li>
+</ol>
+<p><strong>Regression guard (SC-6):</strong> the preserve-list — manual staple toggles, instant
+product-map resolution, no-purchase rule, existing schemas — gets explicit unit
+tests in S1 and S5.</p>
+<p><strong>Out of scope (tracked):</strong> meal planning / recipe→list (issues <strong>#23</strong>, <strong>#24</strong>);
+voice/phone capture; cadence auto-restock; new retailers.</p>
+<hr />
+<h2 id="8-risks-trade-offs">8. Risks &amp; trade-offs</h2>
+<ul>
+<li><strong>R1 — Reconciliation adds a click.</strong> Mitigation: default-all-checked, single
+  submit; it <em>replaces</em> the unreliable silent guess, and the user explicitly
+  asked to "know what made it vs didn't," so the interaction is the feature.</li>
+<li><strong>R2 — Walmart page parsing for stock/alternatives is brittle</strong> (bot-gating,
+  layout changes). Mitigation: best-effort, same as today's verify step; cap
+  confidence and fall to "needs attention" rather than a bad auto-substitute.</li>
+<li><strong>R3 — Learned-map drift / stale products.</strong> Mitigation: learn only on
+  <em>confirmed</em> outcomes; pins always win; an out-of-stock learned product surfaces
+  the substitution flow, which re-learns.</li>
+<li><strong>R4 — Email-signal false positives for "unavailable."</strong> Mitigation: require an
+  <code>orderId</code> tie-back before re-adding; mark <code>refunded</code> rather than deleting
+  history; user sees the re-added item and can remove it.</li>
+<li><strong>R5 — <code>affil.walmart.com</code> bulk-add link limits</strong> (length, per-item caps,
+  affiliate redirects). Mitigation: unchanged from today; the reconcile step is
+  exactly what catches a link that only partially applied.</li>
+<li><strong>R6 — Bookmarklet DOM scrape breaks when Walmart changes markup</strong> (G1+).
+  Mitigation: key on the stable <code>/ip/&lt;itemId&gt;</code> URL pattern, not CSS classes;
+  on parse failure post nothing and fall back to manual reconciliation (never a
+  silent wrong state); the scrape is read-only in the user's own session, so it
+  neither holds credentials nor trips bot detection.</li>
+</ul>
+<hr />
+<h2 id="9-traceability-fr-design-section">9. Traceability — FR → design section</h2>
+<table>
+<thead>
+<tr>
+<th>FR</th>
+<th>Design</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FR-1.1 one-link cart</td>
+<td>§4 G1 (bulk add-to-cart kept)</td>
+</tr>
+<tr>
+<td>FR-1.2 what landed</td>
+<td>§4 G1 reconciliation + 3-state line; §4.6 G1+ auto-fill from real cart</td>
+</tr>
+<tr>
+<td>FR-1.3 no duplicate re-adds</td>
+<td>§4 G1 (<code>addedQty</code> exclusion made accurate); §4.6 confirmed by observed cart</td>
+</tr>
+<tr>
+<td>FR-1.4 resilient handoff</td>
+<td>§4 G1 (per-line uncheck; hack removed)</td>
+</tr>
+<tr>
+<td>FR-1.5 concurrency</td>
+<td>§4 G1 / §5 (<code>isJobRunning</code> guard)</td>
+</tr>
+<tr>
+<td>FR-1.6 estimated total</td>
+<td>§2 Q6 / §4 G1</td>
+</tr>
+<tr>
+<td>FR-2.1 never drop</td>
+<td>§4 G2 (<code>status:'out_of_stock'</code>, no discard)</td>
+</tr>
+<tr>
+<td>FR-2.2 ranked fallbacks</td>
+<td>§4 G2 (<code>alternatives</code> + inline picker)</td>
+</tr>
+<tr>
+<td>FR-2.3 auto-pick + flag</td>
+<td>§4 G2 (<code>substituted:true</code>)</td>
+</tr>
+<tr>
+<td>FR-2.4 remember substitute</td>
+<td>§2 Q3 / §4 G2 (learned product-map)</td>
+</tr>
+<tr>
+<td>FR-3.1/3.5 easy pinning</td>
+<td>§4 G3 (one-click from line)</td>
+</tr>
+<tr>
+<td>FR-3.2 pins sacred</td>
+<td>§4 G3 (guarded + test)</td>
+</tr>
+<tr>
+<td>FR-3.3 prefer last-bought</td>
+<td>§4 G1 confirmed-purchase learning</td>
+</tr>
+<tr>
+<td>FR-3.4 default qty</td>
+<td>§3 / §4 G3 (<code>defaultQty</code>)</td>
+</tr>
+<tr>
+<td>FR-4.1 fix "Other"</td>
+<td>§4 G4 (expanded keywords + staple re-file)</td>
+</tr>
+<tr>
+<td>FR-4.2 overrides persist</td>
+<td>§4 G4 (<code>category-map.json</code>)</td>
+</tr>
+<tr>
+<td>FR-4.3 non-blocking</td>
+<td>§4 G4 (sync resolver; agent only for unknowns)</td>
+</tr>
+<tr>
+<td>FR-5.1 detect unavailable</td>
+<td>§4 G5 (scan agent widened)</td>
+</tr>
+<tr>
+<td>FR-5.2 re-add</td>
+<td>§4 G5 (server apply)</td>
+</tr>
+<tr>
+<td>FR-5.3 no false lastPurchased</td>
+<td>§4 G5 (staple reset)</td>
+</tr>
+<tr>
+<td>FR-5.4 consistent w/ auto-removal</td>
+<td>§4 G5 (apply purchases then unavailable)</td>
+</tr>
+<tr>
+<td>FR-6.1–6.4 preserve</td>
+<td>§3 / §5 / §6 (additive, guarded, tested)</td>
+</tr>
+<tr>
+<td>```</td>
+<td></td>
+</tr>
+</tbody>
+</table></div></body></html>

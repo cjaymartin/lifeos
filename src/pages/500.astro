@@ -1,0 +1,53 @@
+---
+// Custom 500 page — rendered for any uncaught error while rendering a route,
+// including a React island throwing during SSR (NIM-5). Astro passes the error
+// as a prop in production; we only surface the message, never the stack.
+//
+// Deliberately self-contained: no AppLayout, no client:load islands. The whole
+// point is a page that renders even when the normal island-bearing layout is
+// the thing that just failed — so it must not depend on any island SSR itself.
+interface Props {
+  error?: unknown;
+}
+const { error } = Astro.props;
+const message = error instanceof Error ? error.message : undefined;
+---
+
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Something broke — LifeOS</title>
+    <script is:inline>
+      try { document.documentElement.className = localStorage.getItem('theme') ?? 'dark'; } catch {}
+    </script>
+    <style>
+      @import url('/src/styles/globals.css');
+    </style>
+  </head>
+  <body class="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+    <main class="max-w-md w-full text-center space-y-4">
+      <p class="text-5xl font-mono font-semibold text-muted-foreground">500</p>
+      <h1 class="text-xl font-semibold">This page hit an error and couldn't render.</h1>
+      <p class="text-sm text-muted-foreground">
+        Something on this page failed while it was being built on the server. Your
+        data is safe — nothing was changed. Try again, or head back to the dashboard.
+      </p>
+      {message && (
+        <pre class="text-left text-xs bg-muted/50 border border-border rounded-md p-3 overflow-x-auto whitespace-pre-wrap">{message}</pre>
+      )}
+      <div class="flex items-center justify-center gap-3 pt-2">
+        <a
+          href="/"
+          class="inline-flex items-center rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+        >Back to dashboard</a>
+        <button
+          type="button"
+          onclick="location.reload()"
+          class="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+        >Reload</button>
+      </div>
+    </main>
+  </body>
+</html>

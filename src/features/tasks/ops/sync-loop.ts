@@ -9,6 +9,7 @@ import type { TaskProvider } from './provider';
 import { ProviderError } from './provider';
 import { applySync, getSnapshot, mergeCompleted } from './store';
 import { getTodoistToken, TodoistProvider } from './todoist';
+import { fakeTasksEnabled, getFakeProvider } from './fake-provider';
 
 const POLL_MS = 30_000;
 const COMPLETED_REFRESH_MS = 60 * 60 * 1000; // hourly
@@ -30,12 +31,19 @@ const state: {
 });
 
 export function getProvider(): TaskProvider | null {
+  // Test seam: when LIFEOS_FAKE_TASKS=1 (e2e/QA only), use the in-memory fake
+  // so mutations round-trip without a real account (NIM-7). Never set in prod.
+  if (fakeTasksEnabled()) return getFakeProvider();
   const token = getTodoistToken();
   return token ? new TodoistProvider(token) : null;
 }
 
 export function getSyncStatus(): { configured: boolean; polling: boolean; lastError: string | null } {
-  return { configured: !!getTodoistToken(), polling: !!state.timer, lastError: state.lastError };
+  return {
+    configured: fakeTasksEnabled() || !!getTodoistToken(),
+    polling: !!state.timer,
+    lastError: state.lastError,
+  };
 }
 
 /** Run one sync pass now. Serialized — concurrent callers share the in-flight pass. */
@@ -77,9 +85,9 @@ async function doSync(): Promise<void> {
   }
 }
 
-/** Idempotent: starts the polling loop if configured and not already running. */
+/** Idempotent: starts the polling loop if a provider is configured and not already running. */
 export function ensureSyncLoop(): void {
-  if (state.timer || !getTodoistToken()) return;
+  if (state.timer || !getProvider()) return;
   state.timer = setInterval(() => void syncNow(), POLL_MS);
   // Don't hold the process open just for polling
   (state.timer as any).unref?.();

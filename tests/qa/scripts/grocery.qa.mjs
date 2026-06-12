@@ -161,4 +161,19 @@ await qa.check('GROC-12', 'no console errors across the grocery flows above', as
   if (errs.length) throw new Error(`${errs.length} console errors, first: ${errs[0].text}`);
 });
 
+// Runs AFTER GROC-12: a 500 response makes the browser log a console error, so
+// this check must not count against the zero-console-errors assertion above.
+await qa.check('GROC-13', 'island SSR crash terminates with a 500, never hangs', async (page) => {
+  // NIM-5: an island throwing during streamed SSR used to send 200 + partial
+  // body then hang forever. With streaming disabled the throw surfaces before
+  // headers, so we get a fast, terminated 500 + the custom error page. The tight
+  // timeout is the actual regression assertion — a hang would blow past it.
+  const res = await page.goto(BASE + '/dev/ssr-crash?boom=1', { timeout: 8000 });
+  if (res?.status() !== 500) throw new Error(`expected 500, got ${res?.status()}`);
+  await expectVisible(page.getByText(/couldn't render/i));
+  // And the inert form (no ?boom) still renders, proving the route is harmless.
+  await page.goto(BASE + '/dev/ssr-crash', { timeout: 8000 });
+  await expectVisible(page.getByTestId('crash-island-ok'));
+});
+
 await qa.finish();

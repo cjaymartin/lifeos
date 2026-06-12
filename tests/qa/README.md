@@ -34,10 +34,12 @@ Exit code is non-zero when anything fails. Or use the `/qa` skill.
 
 ## Known constraints
 
-- **Builds bake `.env` secrets** (`import.meta.env`), so a locally-built test
-  server can still reach real Todoist despite `test-server.mjs`'s env scrub.
-  Task mutations are therefore excluded from automation (manual cases
-  `TASK-M1/M2`). Tracked in issue #6.
+- **Task mutations** run against an in-memory fake provider, never real
+  Todoist. Runtime secrets are read from `process.env` only (not the baked
+  `import.meta.env`), so `test-server.mjs`'s env scrub keeps the sandbox off the
+  real account even on a dev machine (NIM-7, was issue #6). Mutation cases
+  `TASK-M1/M2` are in the opt-in `tasks-mutations` area:
+  `node tests/qa/run.mjs --area tasks-mutations` (sets `LIFEOS_FAKE_TASKS=1`).
 - **`relogin` is never automated** — it opens a real headed Chrome against the
   retailer (`SET-M1`).
 - The sandbox is rebuilt when the server starts, so area scripts within one

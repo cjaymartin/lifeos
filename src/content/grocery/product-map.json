@@ -84,5 +84,32 @@
     "productId": "126245732",
     "product": "Great Value Original Cream Cheese Spread, 16 oz Tub",
     "productUrl": "https://www.walmart.com/ip/Great-Value-Original-Cream-Cheese-Spread-16-oz-Tub/126245732"
+  },
+  "clorox disinfecting wipes": {
+    "retailer": "walmart",
+    "productId": "14898365",
+    "product": "Clorox Disinfecting Wipes, 225 ct Value Pack, Crisp Lemon and Fresh Scent, 3 Pack (75 ct Each)",
+    "productUrl": "https://www.walmart.com/ip/Clorox-Disinfecting-Wipes-225-ct-Value-Pack-Crisp-Lemon-and-Fresh-Scent-3-Pack-75-ct-Each/14898365",
+    "pinned": true
+  },
+  "strawberries": {
+    "retailer": "walmart",
+    "productId": "22660282",
+    "product": "Fresh Strawberries, 2 lb Container",
+    "productUrl": "https://www.walmart.com/ip/Fresh-Strawberries-2-lb/22660282",
+    "pinned": true
+  },
+  "plastic spoons": {
+    "retailer": "walmart",
+    "productId": "12582850017",
+    "product": "(6 pack) Great Value Plastic Basic White Spoons, 100 Count",
+    "productUrl": "https://www.walmart.com/ip/6-pack-Great-Value-Plastic-Basic-White-Spoons-100-Count/12582850017",
+    "pinned": true
+  },
+  "baby carrots": {
+    "retailer": "walmart",
+    "productId": "10451316",
+    "productUrl": "https://www.walmart.com/ip/10451316",
+    "pinned": true
   }
 }

@@ -1,0 +1,67 @@
+{
+  "builtAt": "2026-06-11T15:30:23.239Z",
+  "carts": [
+    {
+      "retailer": "walmart",
+      "label": "Walmart",
+      "items": [
+        {
+          "itemId": "blackberries-oecvo",
+          "name": "blackberries",
+          "productUrl": "https://www.walmart.com/ip/622057236",
+          "productId": "622057236",
+          "qty": 1,
+          "confidence": "high",
+          "source": "reorder",
+          "addedQty": 1
+        },
+        {
+          "itemId": "blueberries-jcyl3",
+          "name": "blueberries",
+          "productUrl": "https://www.walmart.com/ip/161115457",
+          "productId": "161115457",
+          "qty": 1,
+          "confidence": "high",
+          "source": "reorder",
+          "addedQty": 1
+        },
+        {
+          "itemId": "strawberries-qcw36",
+          "name": "strawberries",
+          "product": "Fresh Strawberries, 2 lb Container",
+          "productUrl": "https://www.walmart.com/ip/Fresh-Strawberries-2-lb/22660282",
+          "productId": "22660282",
+          "qty": 1,
+          "confidence": "high",
+          "source": "reorder",
+          "status": "ok",
+          "addedQty": 1
+        },
+        {
+          "itemId": "plastic-spoons-f4rvz",
+          "name": "plastic spoons",
+          "product": "(6 pack) Great Value Plastic Basic White Spoons, 100 Count",
+          "productUrl": "https://www.walmart.com/ip/6-pack-Great-Value-Plastic-Basic-White-Spoons-100-Count/12582850017",
+          "productId": "12582850017",
+          "qty": 1,
+          "confidence": "high",
+          "source": "reorder",
+          "addedQty": 1
+        },
+        {
+          "itemId": "carrots-xvgtt",
+          "name": "baby carrots",
+          "productUrl": "https://www.walmart.com/ip/10451316",
+          "productId": "10451316",
+          "qty": 1,
+          "confidence": "medium",
+          "source": "new",
+          "status": "ok",
+          "substituted": true
+        }
+      ],
+      "unmatched": [],
+      "cartUrl": "https://affil.walmart.com/cart/addToCart?items=622057236,161115457,22660282,12582850017,10451316"
+    }
+  ]
+}

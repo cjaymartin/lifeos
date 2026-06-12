@@ -1,4 +1,76 @@
 {
-  "lastUpdated": "2026-06-05T17:55:45.279Z",
-  "items": []
+  "lastUpdated": "2026-06-11T15:48:03.982Z",
+  "items": [
+    {
+      "id": "blackberries-oecvo",
+      "name": "blackberries",
+      "category": "Produce",
+      "categoryConfirmed": true,
+      "staple": true,
+      "checked": false,
+      "addedAt": "2026-06-10T11:47:42.992Z",
+      "source": "staple",
+      "note": "running low",
+      "buyFrom": "walmart"
+    },
+    {
+      "id": "strawberries-qcw36",
+      "name": "strawberries",
+      "category": "Produce",
+      "categoryConfirmed": true,
+      "staple": true,
+      "checked": false,
+      "addedAt": "2026-06-10T11:47:46.374Z",
+      "source": "staple",
+      "note": "running low",
+      "buyFrom": "walmart"
+    },
+    {
+      "id": "blueberries-jcyl3",
+      "name": "blueberries",
+      "category": "Produce",
+      "categoryConfirmed": true,
+      "staple": true,
+      "checked": false,
+      "addedAt": "2026-06-10T11:47:48.130Z",
+      "source": "staple",
+      "note": "running low",
+      "buyFrom": "walmart"
+    },
+    {
+      "id": "plastic-spoons-f4rvz",
+      "name": "plastic spoons",
+      "category": "Household",
+      "categoryConfirmed": true,
+      "staple": true,
+      "checked": false,
+      "addedAt": "2026-06-10T11:54:38.346Z",
+      "source": "staple",
+      "note": "running low",
+      "buyFrom": "walmart"
+    },
+    {
+      "id": "carrots-xvgtt",
+      "name": "baby carrots",
+      "category": "Produce",
+      "categoryConfirmed": true,
+      "staple": true,
+      "checked": false,
+      "addedAt": "2026-06-11T15:11:19.921Z",
+      "source": "manual",
+      "buyFrom": "walmart"
+    },
+    {
+      "id": "dog-food-treats-8afyk",
+      "name": "Nature's Recipe Dog Food",
+      "category": "Household",
+      "categoryConfirmed": true,
+      "staple": true,
+      "checked": false,
+      "addedAt": "2026-06-11T15:46:38.288Z",
+      "source": "staple",
+      "note": "running low",
+      "buyFrom": "walmart"
+    }
+  ]
 }

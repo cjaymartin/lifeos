@@ -1,0 +1,15 @@
+---
+// Diagnostic route for NIM-5. `/dev/ssr-crash?boom=1` makes a client:load island
+// throw during SSR — the exact failure class that used to hang /grocery forever.
+// With experimentalDisableStreaming (astro.config.mjs) the throw surfaces before
+// headers are sent, so this returns a real 500 + the custom 500.astro page.
+// Without ?boom=1 it renders normally, so the route is inert in production.
+import AppLayout from '@/layouts/AppLayout.astro';
+import CrashIsland from '@/components/dev/CrashIsland';
+
+const boom = Astro.url.searchParams.get('boom') === '1';
+---
+
+<AppLayout title="SSR crash test">
+  <CrashIsland client:load boom={boom} />
+</AppLayout>

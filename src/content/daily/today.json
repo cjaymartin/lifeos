@@ -1,28 +1,25 @@
 {
-  "date": "2026-06-06",
+  "date": "2026-06-12",
   "greeting": "Good morning, C.Jay.",
-  "briefing": "Good morning! It's a cool, clear 59° start in Mattapoisett, warming to a gorgeous 80° this afternoon with no rain in the forecast — a proper June Saturday. You've got 7 recurring tasks on the docket; don't skip your Fiber and GLP-1, and the weekend chores (vacuuming upstairs, bathrooms) are waiting. Nothing's landing today, but two Amazon orders — your Huel and the Owen Mumford injection aid — are due tomorrow. Enjoy it out there.",
+  "briefing": "Good morning! It's a mild, foggy 66° start in Mattapoisett — the haze should burn off into a warm, humid afternoon topping out near 88°, so dress light and hydrate. Nothing is formally due today, but you've got 4 little overdue habits worth clearing — brushing, fiber, and your daily 'do something.' Your calendar is clear, no trash this morning (that's Wednesday), and your Ridge wallet is on its way.",
   "weather": {
-    "code": 0,
-    "current": 59,
-    "feelsLike": 56,
-    "condition": "Clear",
-    "high": 80,
-    "low": 58,
-    "wind": 5,
+    "code": 45,
+    "current": 65.7,
+    "feelsLike": 69.8,
+    "condition": "Fog, clearing to a warm, humid afternoon",
+    "high": 87.6,
+    "low": 65.7,
+    "wind": 3.1,
     "precipitation": "None expected"
   },
   "tasks": {
-    "dueToday": 7,
-    "overdue": 0,
+    "dueToday": 0,
+    "overdue": 4,
     "items": [
-      "Take Fiber",
-      "Take GLP-1",
-      "Do Something",
-      "Brush Teeth Morning",
-      "Brush Teeth Evening",
-      "Vacuum Upstairs",
-      "Clean Bathrooms"
+      "Take Fiber (overdue)",
+      "Do Something (overdue)",
+      "Brush Teeth Morning (overdue)",
+      "Brush Teeth Evening (overdue)"
     ]
   },
   "calendar": [],
@@ -32,10 +29,9 @@
     "note": null
   },
   "items": [
-    "Take your daily Fiber and GLP-1",
-    "Vacuum upstairs",
-    "Clean the bathrooms",
-    "Brush teeth — morning and 7 PM",
-    "Do something toward improving house/life"
+    "Clear 4 overdue daily habits — fiber, 'do something', and brushing",
+    "Warm, humid day ahead: high near 88° — dress light and hydrate",
+    "Calendar is clear today",
+    "Ridge wallet is on its way"
   ]
 }
