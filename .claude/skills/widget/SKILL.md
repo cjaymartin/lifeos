@@ -28,6 +28,12 @@ Manage `src/content/widgets/registry.json` which controls what appears on the da
 
 Use **order gaps of 10** (10, 20, 30…) so items can always be inserted between existing ones.
 
+### Ordering principle: ephemeral before static
+
+When assigning `order` (on `create` or `reorder`), **rank ephemeral widgets ahead of static ones.** An *ephemeral* widget only appears some of the time — its `displayCondition` is conditional (`mon-to-trash-day`, `has-events`, `has-data`, `has-deliveries`), so on most days it's absent. A *static* widget (`displayCondition: always`, e.g. `note`, or one whose data is effectively always present like `tasks`) is there every day.
+
+Put the conditional/time-sensitive cards first so that on the rare day they *do* fire (trash day, a birthday, an out-for-delivery package) they sit at the top where the eye lands, instead of being buried under cards the user has already learned to ignore. Static, always-on cards belong lower. Within the ephemeral group, the more urgent/time-boxed the trigger, the earlier it goes (e.g. trash → birthdays → deliveries → … → tasks → notes).
+
 ---
 
 ## Built-in types
