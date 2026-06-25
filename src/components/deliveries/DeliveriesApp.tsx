@@ -1,10 +1,12 @@
 import { useState, useCallback, useMemo } from 'react';
-import { RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Package, Undo2, ChevronRight } from 'lucide-react';
+import { RefreshCw, Check, AlertCircle, X, ExternalLink, Mail, Package, Undo2, ChevronRight, Truck } from 'lucide-react';
 import type { Delivery, DeliveriesData, DeliveryStatus } from '@/features/deliveries/types';
 import { STATUS_ORDER, STATUS_LABELS } from '@/features/deliveries/types';
+import type { WalmartLiveDelivery } from '@/features/grocery/types';
 import { watchRefreshJob, JOB_STATE_COLORS, type JobState } from '@/lib/client/job-watch';
 import { makeOptimistic } from '@/lib/client/stack-client';
 import { deliveriesClient } from '@/features/deliveries/client';
+import { groceryClient } from '@/features/grocery/client';
 
 const STATUS_BADGE: Record<DeliveryStatus, string> = {
   'out-for-delivery': 'bg-warning-subtle text-warning',
@@ -124,6 +126,26 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
   const [state, setState] = useState<JobState>('idle');
   const [showDismissed, setShowDismissed] = useState(false);
 
+  // Live Walmart deliveries, pulled on demand through the grocery extension
+  // channel (ADR 0001) — prefers the live account scrape, falls back to the
+  // Gmail feed. Separate from the Gmail sync above.
+  const [liveDeliv, setLiveDeliv] = useState<WalmartLiveDelivery[] | null>(null);
+  const [liveState, setLiveState] = useState<JobState>('idle');
+  const [liveSource, setLiveSource] = useState<'walmart' | 'gmail' | null>(null);
+
+  const loadWalmartLive = useCallback(async () => {
+    setLiveState('loading');
+    try {
+      const res = await groceryClient.walmart.getDeliveries();
+      if (!res.ok) throw new Error(res.error || 'failed');
+      setLiveDeliv(res.deliveries ?? []);
+      setLiveSource(res.source ?? null);
+      setLiveState('done');
+    } catch {
+      setLiveState('error');
+    }
+  }, []);
+
   const mutate = useMemo(
     () =>
       makeOptimistic<DeliveriesData | null>({
@@ -190,18 +212,69 @@ export default function DeliveriesApp({ initial }: { initial: DeliveriesData | n
             <p className="text-xs text-muted-foreground">Last synced {lastSyncedLabel(data.lastSynced)}</p>
           )}
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={state === 'loading'}
-          title={state === 'loading' ? 'Running /populate-deliveries…' : 'Re-scan Gmail for deliveries'}
-          className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${colors}`}>
-          {state === 'loading' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-          {state === 'idle'    && <RefreshCw className="w-3.5 h-3.5" />}
-          {state === 'done'    && <Check      className="w-3.5 h-3.5" />}
-          {state === 'error'   && <AlertCircle className="w-3.5 h-3.5" />}
-          <span>{label}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadWalmartLive}
+            disabled={liveState === 'loading'}
+            title="Pull live Walmart deliveries (via the LifeOS extension, or the local session)"
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${JOB_STATE_COLORS[liveState]}`}>
+            {liveState === 'loading' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Truck className="w-3.5 h-3.5" />}
+            <span>{liveState === 'loading' ? 'Checking Walmart…' : 'Walmart live'}</span>
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={state === 'loading'}
+            title={state === 'loading' ? 'Running /populate-deliveries…' : 'Re-scan Gmail for deliveries'}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${colors}`}>
+            {state === 'loading' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+            {state === 'idle'    && <RefreshCw className="w-3.5 h-3.5" />}
+            {state === 'done'    && <Check      className="w-3.5 h-3.5" />}
+            {state === 'error'   && <AlertCircle className="w-3.5 h-3.5" />}
+            <span>{label}</span>
+          </button>
+        </div>
       </div>
+
+      {liveState === 'error' && (
+        <p className="text-xs text-destructive">
+          Couldn’t reach Walmart — install the LifeOS extension (and stay signed in), or sign in under Settings → Logins.
+        </p>
+      )}
+      {liveDeliv !== null && liveState !== 'error' && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <Truck className="w-3.5 h-3.5" /> Walmart — live
+            {liveSource && (
+              <span className="normal-case tracking-normal text-muted-foreground/60">
+                ({liveSource === 'walmart' ? 'from your account' : 'from Gmail'})
+              </span>
+            )}
+          </h2>
+          {liveDeliv.length === 0 ? (
+            <p className="text-xs text-muted-foreground/70">No in-flight Walmart deliveries right now.</p>
+          ) : (
+            <ul className="space-y-2">
+              {liveDeliv.map((d, i) => (
+                <li key={d.orderId ?? i} className="flex items-start gap-3 rounded-lg border border-border bg-card p-4">
+                  <div className="mt-0.5 shrink-0 text-muted-foreground"><Truck className="w-4 h-4" /></div>
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">Walmart</span>
+                      {d.status && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">{d.status}</span>
+                      )}
+                      {d.eta && <span className="text-xs text-muted-foreground">{d.eta}</span>}
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {d.items.map(it => it.product).filter(Boolean).join(', ') || `${d.items.length} item${d.items.length === 1 ? '' : 's'}`}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       {groups.length === 0 && (
         <div className="rounded-xl border border-dashed border-border p-10 text-center space-y-2">

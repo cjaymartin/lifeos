@@ -1,5 +1,5 @@
 import { defineMiddleware } from 'astro:middleware';
-import { hasSession } from '@/lib/auth';
+import { hasSession, verifyBearer, getSessionSecret } from '@/lib/auth';
 import { ensureSyncLoop } from '@/features/tasks/ops/sync-loop';
 
 const PUBLIC = [
@@ -18,9 +18,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
   if (PUBLIC.some((p) => pathname.startsWith(p))) return next();
 
-  if (!hasSession(context.cookies)) {
-    return context.redirect('/login');
-  }
+  // A valid session cookie (browser) OR bearer token (the grocery extension and
+  // the walmart CLI, which can't carry the httpOnly/SameSite cookie cross-site)
+  // is authenticated. Routes still run their own requireSession/…OrToken guard.
+  if (hasSession(context.cookies)) return next();
+  if (verifyBearer(context.request.headers.get('authorization'), getSessionSecret())) return next();
 
-  return next();
+  return context.redirect('/login');
 });
