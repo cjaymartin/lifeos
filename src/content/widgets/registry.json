@@ -50,6 +50,35 @@
       "populator": "populate-deliveries (also invoked by populate-daily step-5.5)"
     },
     {
+      "id": "water-delivery",
+      "type": "water-delivery",
+      "label": "Water Delivery",
+      "enabled": true,
+      "order": 12,
+      "size": "card",
+      "displayCondition": "water-window",
+      "config": {
+        "link": "https://www.readyrefresh.com/en/account"
+      },
+      "dataKey": "water",
+      "populator": "populate-daily step-5.7"
+    },
+    {
+      "id": "birthdays",
+      "type": "birthday",
+      "label": "Birthdays",
+      "enabled": true,
+      "order": 15,
+      "size": "card",
+      "displayCondition": "has-events",
+      "config": {
+        "maxItems": 4,
+        "link": "https://calendar.google.com/"
+      },
+      "dataKey": "birthdays",
+      "populator": "populate-daily step-3.5"
+    },
+    {
       "id": "tasks",
       "type": "tasks",
       "label": "Tasks",

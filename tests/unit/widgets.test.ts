@@ -60,4 +60,22 @@ describe('selectWidgets', () => {
   it('no displayCondition always shows', () => {
     expect(selectWidgets([w({})], ctx({ daily: null })).cards).toHaveLength(1);
   });
+
+  it('water-window shows from 0 to 14 days out, hidden beyond or in the past', () => {
+    const now = new Date('2026-06-25T12:00:00');
+    const water = (nextDate: string) =>
+      [w({ id: 'wd', type: 'water-delivery', displayCondition: 'water-window', dataKey: 'water' })];
+    const at = (nextDate: string) =>
+      selectWidgets(water(nextDate), ctx({ now, daily: { water: { nextDate, vendor: 'ReadyRefresh' } } as any })).cards;
+    expect(at('2026-06-26')).toHaveLength(1);  // tomorrow (warning)
+    expect(at('2026-06-25')).toHaveLength(1);  // today
+    expect(at('2026-07-09')).toHaveLength(1);  // exactly 14 days out
+    expect(at('2026-07-10')).toHaveLength(0);  // 15 days — too far
+    expect(at('2026-06-24')).toHaveLength(0);  // yesterday — past
+  });
+
+  it('water-window hides when there is no water data', () => {
+    const wd = [w({ id: 'wd', type: 'water-delivery', displayCondition: 'water-window', dataKey: 'water' })];
+    expect(selectWidgets(wd, ctx({ daily: {} as any })).cards).toHaveLength(0);
+  });
 });

@@ -28,7 +28,14 @@
   "calendar": [],
   "trash": {
     "today": false,
-    "recycling": false,
+    "recycling": true,
+    "note": null
+  },
+  "birthdays": [],
+  "water": {
+    "nextDate": "2026-06-26",
+    "vendor": "ReadyRefresh",
+    "product": "Poland Spring",
     "note": null
   },
   "items": [
