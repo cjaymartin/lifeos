@@ -38,5 +38,8 @@ const currentStack = stacks.find(s => currentPath === s.href || currentPath.star
     {currentStack && (
       <ChatSidebar stackId={currentStack.id} stackLabel={currentStack.label} currentPath={currentPath} pageTitle={title} client:load />
     )}
+    {!currentStack && currentPath === '/' && (
+      <ChatSidebar endpoint="/api/chat/dashboard" stackId="dashboard" stackLabel="Dashboard" currentPath={currentPath} pageTitle={title} client:load />
+    )}
   </body>
 </html>

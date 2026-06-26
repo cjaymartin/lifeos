@@ -47,6 +47,16 @@ src/content/settings/.probe-*
 # claude code session worktrees
 .claude/worktrees/
 
+# nimbalyst generated plugin state (local, regenerated)
+.claude/plugins/
+
+# local-first content data — lives on the host volume, not version-controlled
+# (regenerated/synced at runtime: grocery list, tasks mirror, deliveries, status)
+src/content/grocery/*.json
+src/content/tasks/*.json
+src/content/deliveries/*.json
+src/content/settings/status.json
+
 # test infrastructure (sandboxed content copies, playwright artifacts)
 .test-sandbox/
 test-results/
