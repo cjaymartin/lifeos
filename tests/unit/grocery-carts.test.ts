@@ -183,9 +183,50 @@ describe('applyObservedCart', () => {
     expect(lines.find((l: any) => l.itemId === 'b').addedQty).toBeUndefined(); // absent → cleared
   });
 
-  it('returns ok:false when the retailer cart is missing', async () => {
+  it('no-ops (ok, nothing in cart) when the retailer cart is missing — a live sync may run with no build', async () => {
     writeJson('carts.json', { builtAt: 'x', carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [] }] });
-    expect((await grocery.applyObservedCart('amazon', [{ productId: '1' }])).ok).toBe(false);
+    const res = await grocery.applyObservedCart('amazon', [{ productId: '1' }]);
+    expect(res).toMatchObject({ ok: true, inCart: 0, unknown: ['1'] });
+  });
+});
+
+describe('adoptWalmartCartLine', () => {
+  it('adds a list item already-in-cart, pins the product, and can make a staple', async () => {
+    const res = await grocery.adoptWalmartCartLine({
+      productId: '43984343', product: 'Fairlife 2% Milk', productUrl: 'https://www.walmart.com/ip/43984343',
+      price: '$4.12', qty: 1, asStaple: true,
+    });
+    expect(res.ok).toBe(true);
+    expect(res.itemId).toBeTruthy();
+
+    // list item exists, flagged as a staple
+    const item = readJson('grocery.json').items.find((i: any) => i.id === res.itemId);
+    expect(item).toMatchObject({ name: 'Fairlife 2% Milk', staple: true, checked: false });
+
+    // exact product pinned for future reorders
+    expect(readJson('product-map.json')['fairlife 2% milk']).toMatchObject({
+      retailer: 'walmart', productId: '43984343', pinned: true,
+    });
+
+    // a Walmart cart line, marked already-in-cart
+    const cart = readJson('carts.json').carts.find((c: any) => c.retailer === 'walmart');
+    const line = cart.items.find((m: any) => m.productId === '43984343');
+    expect(line).toMatchObject({ itemId: res.itemId, addedQty: 1, qty: 1 });
+    expect(cart.cartUrl).toContain('43984343');
+
+    // staple created, stocked
+    expect(readJson('staples.json').staples.find((s: any) => s.name === 'Fairlife 2% Milk')).toMatchObject({ status: 'stocked' });
+  });
+
+  it('reuses an existing unchecked list item instead of duplicating', async () => {
+    writeJson('grocery.json', { lastUpdated: 'x', items: [
+      { id: 'milk-1', name: 'milk', category: 'Dairy & Eggs', checked: false, addedAt: 'x', source: 'manual' },
+    ] });
+    const res = await grocery.adoptWalmartCartLine({ productId: '99', product: 'milk', qty: 2 });
+    expect(res.itemId).toBe('milk-1');
+    expect(readJson('grocery.json').items).toHaveLength(1);
+    const line = readJson('carts.json').carts[0].items.find((m: any) => m.productId === '99');
+    expect(line).toMatchObject({ itemId: 'milk-1', addedQty: 2 });
   });
 });
 

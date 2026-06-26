@@ -1,0 +1,57 @@
+---
+import WidgetCard from '@/components/widgets/WidgetCard.astro';
+import type { WidgetDef, DailyData } from '@/lib/widgets';
+import { daysUntil, WATER_WARNING_DAYS } from '@/lib/widgets';
+
+interface Props {
+  w: WidgetDef;
+  daily: DailyData | null;
+}
+const { w, daily } = Astro.props;
+const water = daily?.water;
+
+// Live day-math so the card stays accurate even if today.json is a day stale.
+const days = water ? daysUntil(water.nextDate) : null;
+const isWarning = days !== null && days <= WATER_WARNING_DAYS;
+const when =
+  days === 0 ? 'TODAY'
+  : days === 1 ? 'tomorrow'
+  : `in ${days} days`;
+const dateLabel = water
+  ? new Date(`${water.nextDate}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  : '';
+---
+
+{water && days !== null && days >= 0 && (
+  <WidgetCard
+    class={`flex flex-col justify-between gap-3 ${
+      isWarning ? 'bg-warning-subtle border-warning-border' : 'bg-card border-border'
+    }`}
+    link={w.config.link ? String(w.config.link) : undefined}
+    linkLabel={`Open ${w.label}`}
+  >
+    <div class="space-y-0.5">
+      <span class={`text-xs font-semibold uppercase tracking-wider ${
+        isWarning ? 'text-warning' : 'text-muted-foreground'
+      }`}>
+        {isWarning ? 'Coming up soon' : 'Upcoming'}
+      </span>
+      <p class={`text-base font-semibold ${isWarning ? 'text-warning' : 'text-foreground'}`}>
+        💧 Water delivery {when}
+      </p>
+    </div>
+    <div class="space-y-1">
+      <div class="flex items-center gap-2">
+        <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+          isWarning ? 'bg-warning-subtle text-warning' : 'bg-muted text-muted-foreground'
+        }`}>{dateLabel}</span>
+      </div>
+      <p class="text-xs text-muted-foreground">
+        {water.product ?? 'Poland Spring'} · {water.vendor}
+      </p>
+      {water.note && (
+        <p class="text-xs text-warning/70">{water.note}</p>
+      )}
+    </div>
+  </WidgetCard>
+)}

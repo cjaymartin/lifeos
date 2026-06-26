@@ -203,3 +203,61 @@ export function buildAddToCartUrl(
 export function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
 }
+
+/* ── Walmart on-demand cart control ──────────────────────────────────────────
+ * Five operations the Walmart agent / UI can run AT ANY TIME against the real
+ * cart, routed through the browser extension when present (the user's own
+ * logged-in session) and falling back to the local Playwright session. See
+ * docs/adr/0001-walmart-cart-control.md. */
+
+/** The five on-demand Walmart operations. */
+export type WalmartOp = 'get-cart' | 'get-history' | 'get-deliveries' | 'add-item' | 'remove-item';
+
+export const WALMART_OPS: WalmartOp[] = [
+  'get-cart', 'get-history', 'get-deliveries', 'add-item', 'remove-item',
+];
+
+/** A line observed in the real Walmart cart. */
+export interface WalmartCartLine {
+  productId: string;
+  product?: string;
+  price?: string;
+  qty?: number;
+  productUrl?: string;
+}
+
+/** An in-flight Walmart delivery scraped from the account/orders page. */
+export interface WalmartLiveDelivery {
+  orderId?: string;
+  /** Free-form Walmart status text ("Shipped", "Arriving today", "Preparing"). */
+  status?: string;
+  /** Human ETA text as Walmart renders it. */
+  eta?: string;
+  items: { productId?: string; product?: string }[];
+}
+
+/** Params accepted by the add/remove ops (and ignored by the read ops). */
+export interface WalmartOpParams {
+  productId?: string;
+  qty?: number;
+  /** Batch add — when present, add-item adds every product in one navigation
+   *  (one affiliate deep link) instead of a round-trip per item. */
+  items?: { productId: string; qty?: number }[];
+}
+
+/** Which executor satisfied a command. */
+export type WalmartExecutor = 'extension' | 'fallback';
+
+/** Unified result of an on-demand Walmart op — the field that's populated
+ *  depends on the op (cart / history / deliveries). */
+export interface WalmartOpResult {
+  ok: boolean;
+  op: WalmartOp;
+  executor?: WalmartExecutor;
+  cart?: WalmartCartLine[];
+  history?: OrderedProduct[];
+  deliveries?: WalmartLiveDelivery[];
+  /** get-deliveries only: which source the deliveries came from. */
+  source?: 'walmart' | 'gmail';
+  error?: string;
+}

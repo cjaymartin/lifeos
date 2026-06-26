@@ -1,0 +1,58 @@
+---
+import WidgetCard from '@/components/widgets/WidgetCard.astro';
+import type { WidgetDef, DailyData } from '@/lib/widgets';
+import { describeBirthdays, anyImminent } from '@/lib/birthdays';
+
+interface Props {
+  w: WidgetDef;
+  daily: DailyData | null;
+}
+const { w, daily } = Astro.props;
+
+// Compute urgency live at render time so the card stays correct if today.json
+// is a day stale. `date` is derived here (not from daily.date) for the same reason.
+const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, local
+const views = describeBirthdays(daily?.birthdays ?? [], today);
+const maxItems = Number(w.config.maxItems ?? 4);
+const shown = views.slice(0, maxItems);
+const hot = anyImminent(views);
+const next = views[0];
+---
+
+{shown.length > 0 && (
+  <WidgetCard
+    class={`flex flex-col justify-between gap-3 ${
+      hot ? 'bg-warning-subtle border-warning-border' : 'bg-card border-border'
+    }`}
+    link={w.config.link ? String(w.config.link) : undefined}
+    linkLabel={`Open ${w.label}`}
+  >
+    <div class="space-y-0.5">
+      <span class={`text-xs font-semibold uppercase tracking-wider ${
+        hot ? 'text-warning' : 'text-muted-foreground'
+      }`}>
+        {hot ? next.label : 'Upcoming'}
+      </span>
+      <p class={`text-base font-semibold ${hot ? 'text-warning' : 'text-foreground'}`}>
+        🎂 {w.label}
+      </p>
+    </div>
+    <ul class="space-y-1.5">
+      {shown.map((b) => (
+        <li class="flex items-center justify-between gap-2">
+          <span class={`text-sm ${b.imminent ? 'font-semibold text-warning' : 'text-foreground'}`}>
+            {b.name}
+          </span>
+          <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            b.imminent ? 'bg-warning-subtle text-warning' : 'bg-muted text-muted-foreground'
+          }`}>
+            {b.label}
+          </span>
+        </li>
+      ))}
+    </ul>
+    {views.length > shown.length && (
+      <p class="text-xs text-muted-foreground">+{views.length - shown.length} more this month</p>
+    )}
+  </WidgetCard>
+)}

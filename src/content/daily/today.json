@@ -1,37 +1,45 @@
 {
-  "date": "2026-06-12",
+  "date": "2026-06-25",
   "greeting": "Good morning, C.Jay.",
-  "briefing": "Good morning! It's a mild, foggy 66° start in Mattapoisett — the haze should burn off into a warm, humid afternoon topping out near 88°, so dress light and hydrate. Nothing is formally due today, but you've got 4 little overdue habits worth clearing — brushing, fiber, and your daily 'do something.' Your calendar is clear, no trash this morning (that's Wednesday), and your Ridge wallet is on its way.",
+  "briefing": "Good morning! It's a calm, clear 60° start in Mattapoisett, warming to a pleasant high of 78° with no rain in sight — a great day to be outside. Your calendar is wide open, so it's a good window to clear out the 6 overdue tasks that have piled up, starting with your daily fiber. Heads up that 'Pay off 3272' is due tomorrow. Trash went out yesterday, and since this was a recycling week the bins are squared away until next week.",
   "weather": {
-    "code": 45,
-    "current": 65.7,
-    "feelsLike": 69.8,
-    "condition": "Fog, clearing to a warm, humid afternoon",
-    "high": 87.6,
-    "low": 65.7,
-    "wind": 3.1,
+    "code": 0,
+    "current": 60.1,
+    "feelsLike": 59.5,
+    "condition": "Clear",
+    "high": 78,
+    "low": 60,
+    "wind": 4.3,
     "precipitation": "None expected"
   },
   "tasks": {
     "dueToday": 0,
-    "overdue": 4,
+    "overdue": 6,
     "items": [
-      "Take Fiber (overdue)",
-      "Do Something (overdue)",
-      "Brush Teeth Morning (overdue)",
-      "Brush Teeth Evening (overdue)"
+      "Take Fiber — overdue",
+      "Do Something — overdue",
+      "Brush Teeth Morning — overdue",
+      "Clean Bathrooms — overdue",
+      "Brush Teeth Evening — overdue"
     ]
   },
   "calendar": [],
   "trash": {
     "today": false,
-    "recycling": false,
+    "recycling": true,
+    "note": null
+  },
+  "birthdays": [],
+  "water": {
+    "nextDate": "2026-06-26",
+    "vendor": "ReadyRefresh",
+    "product": "Poland Spring",
     "note": null
   },
   "items": [
-    "Clear 4 overdue daily habits — fiber, 'do something', and brushing",
-    "Warm, humid day ahead: high near 88° — dress light and hydrate",
-    "Calendar is clear today",
-    "Ridge wallet is on its way"
+    "💊 Take your fiber — overdue priority item",
+    "✅ Clear 6 overdue chores while the calendar's open",
+    "💳 Heads up: 'Pay off 3272' is due tomorrow",
+    "☀️ Clear skies, high of 78° — a good day to get outside"
   ]
 }
