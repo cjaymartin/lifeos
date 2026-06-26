@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type {
   GroceryState, GroceryItem, Staple, StapleStatus, Retailer, CartsData, ProductRef, RestockAt,
+  WalmartCartLine,
 } from '@/features/grocery/types';
 import {
   DEFAULT_CATEGORIES, STAPLE_STATUS_LABELS, RETAILER_LABELS, RETAILER_CART_URLS,
@@ -787,6 +788,101 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
   const checkoutCart = useCallback((retailer: Retailer) =>
     mutate(s => s, () => groceryClient.checkout({ retailer }), { sync: 'always' }), [mutate]);
 
+  /* ── Live Walmart cart control (extension channel → local-session
+   *     fallback, ADR 0001). These operate the REAL Walmart cart on demand,
+   *     unlike the deep-link handoff above. ───────────────────────────────── */
+  const [liveBusy, setLiveBusy] = useState(false);
+  const [liveMsg, setLiveMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  const [liveCart, setLiveCart] = useState<WalmartCartLine[] | null>(null);
+  const [liveCartState, setLiveCartState] = useState<JobState>('idle');
+  const [liveExec, setLiveExec] = useState<'extension' | 'fallback' | undefined>(undefined);
+
+  const execLabel = (r?: string) => (r === 'extension' ? 'your browser' : r === 'fallback' ? 'the local session' : 'Walmart');
+
+  /** Reconcile the built cart's "in cart" chips against a real Walmart cart.
+   *  Best-effort — when there's no built cart to reconcile, this is a no-op and
+   *  must never surface as an error on the live read/add/remove that called it. */
+  const reconcileFromLive = useCallback(async (lines: WalmartCartLine[]) => {
+    try {
+      await groceryClient.observeCart('walmart', lines.map(l => ({ productId: l.productId })));
+      await refetch();
+    } catch { /* no built cart present → nothing to reconcile */ }
+  }, [refetch]);
+
+  /** Push the built Walmart cart's pending lines into the real cart in one
+   *  navigation, then auto-reconcile from what actually landed (no manual
+   *  "what made it" step). */
+  const addCartLive = useCallback(async (pending: { productId: string; qty?: number }[]) => {
+    if (!pending.length) return;
+    setLiveBusy(true); setLiveMsg(null);
+    try {
+      const res = await groceryClient.walmart.addItems(pending);
+      if (!res.ok) throw new Error(res.error || 'Add failed');
+      setLiveCart(res.cart ?? null);
+      setLiveExec(res.executor);
+      await reconcileFromLive(res.cart ?? []);
+      setLiveMsg({ tone: 'ok', text: `Added via ${execLabel(res.executor)} — ${(res.cart ?? []).length} item${(res.cart ?? []).length === 1 ? '' : 's'} in cart` });
+    } catch (e) {
+      setLiveMsg({ tone: 'err', text: e instanceof Error ? e.message : 'Add failed — open the link, or check the extension / Walmart login' });
+    } finally {
+      setLiveBusy(false);
+    }
+  }, [reconcileFromLive]);
+
+  /** Pull the real Walmart cart on demand for the live panel. */
+  const syncLiveCart = useCallback(async () => {
+    setLiveCartState('loading'); setLiveMsg(null);
+    try {
+      const res = await groceryClient.walmart.getCart();
+      if (!res.ok) throw new Error(res.error || 'Sync failed');
+      setLiveCart(res.cart ?? []);
+      setLiveExec(res.executor);
+      setLiveCartState('done');
+      setLiveMsg(null);
+      await reconcileFromLive(res.cart ?? []);
+    } catch (e) {
+      setLiveCartState('error');
+      setLiveMsg({ tone: 'err', text: e instanceof Error ? e.message : 'Could not reach Walmart — install the extension or sign in under Settings → Logins' });
+    }
+  }, [reconcileFromLive]);
+
+  /** Remove a line from the real Walmart cart. */
+  const removeLive = useCallback(async (productId: string) => {
+    setLiveBusy(true); setLiveMsg(null);
+    setLiveCart(c => (c ? c.filter(l => l.productId !== productId) : c)); // optimistic
+    try {
+      const res = await groceryClient.walmart.removeItem(productId);
+      if (!res.ok) throw new Error(res.error || 'Remove failed');
+      setLiveCart(res.cart ?? []);
+      setLiveExec(res.executor);
+      await reconcileFromLive(res.cart ?? []);
+    } catch (e) {
+      setLiveMsg({ tone: 'err', text: e instanceof Error ? e.message : 'Remove failed' });
+      await syncLiveCart(); // resync to the truth
+    } finally {
+      setLiveBusy(false);
+    }
+  }, [reconcileFromLive, syncLiveCart]);
+
+  // productId → how it was adopted onto the list ('list' or also a 'staple')
+  const [adopted, setAdopted] = useState<Record<string, 'list' | 'staple'>>({});
+
+  /** Capture a live-cart line onto the grocery list as already-in-cart, and
+   *  (optionally) save it as a staple — the one-tap "I already added this". */
+  const adoptLive = useCallback(async (l: WalmartCartLine, asStaple: boolean) => {
+    setLiveBusy(true); setLiveMsg(null);
+    try {
+      const res = await groceryClient.walmart.adopt(l, asStaple);
+      if (!res.ok) throw new Error('Could not add to list');
+      setAdopted(a => ({ ...a, [l.productId]: asStaple || a[l.productId] === 'staple' ? 'staple' : 'list' }));
+      await refetch();
+    } catch (e) {
+      setLiveMsg({ tone: 'err', text: e instanceof Error ? e.message : 'Could not add to list' });
+    } finally {
+      setLiveBusy(false);
+    }
+  }, [refetch]);
+
   const clearChecked = useCallback(async () => {
     const ids = state.items.filter(i => i.checked).map(i => i.id);
     if (ids.length === 0) return;
@@ -1222,18 +1318,38 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
                     {pending.length > 0 && addUrl ? (
-                      <a href={addUrl} target="_blank" rel="noopener noreferrer"
-                         // Opens the bulk add link in a new tab; the reconcile panel
-                         // (opened here) is how we learn what actually landed. No
-                         // deferral needed — addedQty changes only on confirm, so the
-                         // anchor isn't swapped mid-click.
-                         onClick={() => openReconcile(cart.retailer)}
-                         title={`Adds ${pending.length} item${pending.length === 1 ? '' : 's'} to your ${cart.label || RETAILER_LABELS[cart.retailer]} cart, then asks which ones landed`}
-                         className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
-                        <ShoppingCart className="w-3.5 h-3.5" /> Add to cart ({pending.length})
-                      </a>
+                      cart.retailer === 'walmart' ? (
+                        /* Live add: pushes straight into the real Walmart cart via
+                         * the extension (or local-session fallback) and reconciles
+                         * automatically — no manual "what landed" step. The deep
+                         * link stays as a fallback. */
+                        <>
+                          <button
+                            onClick={() => addCartLive(pending.map(m => ({ productId: m.productId, qty: (m.qty ?? 1) - (m.addedQty ?? 0) })))}
+                            disabled={liveBusy}
+                            title={`Adds ${pending.length} item${pending.length === 1 ? '' : 's'} to your real Walmart cart in your logged-in session`}
+                            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity">
+                            {liveBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShoppingCart className="w-3.5 h-3.5" />}
+                            Add to cart ({pending.length})
+                          </button>
+                          <a href={addUrl} target="_blank" rel="noopener noreferrer"
+                             onClick={() => openReconcile(cart.retailer)}
+                             title="Open the add-to-cart link in a new tab instead (then confirm what landed)"
+                             className="text-xs px-2 py-1.5 rounded-md text-muted-foreground/60 hover:text-foreground transition-colors">
+                            Open link
+                          </a>
+                        </>
+                      ) : (
+                        <a href={addUrl} target="_blank" rel="noopener noreferrer"
+                           // Amazon stays deep-link only; the reconcile panel learns what landed.
+                           onClick={() => openReconcile(cart.retailer)}
+                           title={`Adds ${pending.length} item${pending.length === 1 ? '' : 's'} to your ${cart.label || RETAILER_LABELS[cart.retailer]} cart, then asks which ones landed`}
+                           className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+                          <ShoppingCart className="w-3.5 h-3.5" /> Add to cart ({pending.length})
+                        </a>
+                      )
                     ) : (
                       <>
                         <a href={RETAILER_CART_URLS[cart.retailer]} target="_blank" rel="noopener noreferrer"
@@ -1263,6 +1379,11 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
                     </button>
                   </div>
                 )}
+                {cart.retailer === 'walmart' && liveMsg && (
+                  <p className={`text-[11px] ${liveMsg.tone === 'err' ? 'text-destructive' : 'text-emerald-500'}`}>
+                    {liveMsg.text}
+                  </p>
+                )}
               </div>
               );
             })}
@@ -1272,6 +1393,89 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
           </p>
         </section>
       )}
+
+      {/* Live Walmart cart — the REAL cart, on demand (extension or local session) */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Live Walmart cart</h2>
+          <button
+            onClick={syncLiveCart}
+            disabled={liveCartState === 'loading'}
+            title="Read what's actually in your Walmart cart right now"
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${jobColors(liveCartState)}`}>
+            {liveCartState === 'loading' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            <span>{liveCartState === 'loading' ? 'Syncing…' : 'Sync'}</span>
+          </button>
+        </div>
+        {liveCart === null ? (
+          <p className="text-xs text-muted-foreground/70">Tap <span className="text-foreground">Sync</span> to load your real Walmart cart — works through the LifeOS extension, or the local session as a fallback.</p>
+        ) : liveCart.length === 0 ? (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground/70">
+              Your Walmart cart looks empty{liveExec ? ` — read via ${execLabel(liveExec)}` : ''}.
+            </p>
+            {liveExec === 'fallback' && (
+              <p className="text-[11px] text-warning">
+                That came from the local session, not your browser. Reload the LifeOS extension (v0.3.0+), keep a walmart.com tab open, and stay signed in — then Sync reads your own cart.
+              </p>
+            )}
+          </div>
+        ) : (
+          <ul className="rounded-xl border border-border bg-card divide-y divide-border">
+            {liveCart.map(l => (
+              <li key={l.productId} className="group flex items-center gap-2 px-3 py-2 text-xs">
+                <span className="flex-1 min-w-0 truncate text-foreground">
+                  {l.product || `Item ${l.productId}`}{l.price ? <span className="text-muted-foreground"> · {l.price}</span> : null}
+                </span>
+                {adopted[l.productId] ? (
+                  <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-500" title="On your list, marked already in cart">
+                    <Check className="w-3 h-3" />{adopted[l.productId] === 'staple' ? 'list · staple' : 'on list'}
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => adoptLive(l, false)}
+                      disabled={liveBusy}
+                      title="Add to my list, marked already in cart"
+                      aria-label={`Add ${l.product || l.productId} to list`}
+                      className="shrink-0 p-0.5 rounded text-muted-foreground/40 hover:text-primary disabled:opacity-50 transition-colors">
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => adoptLive(l, true)}
+                      disabled={liveBusy}
+                      title="Add to list and save as a staple"
+                      aria-label={`Add ${l.product || l.productId} to list and staples`}
+                      className="shrink-0 p-0.5 rounded text-muted-foreground/40 hover:text-amber-500 disabled:opacity-50 transition-colors">
+                      <Star className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+                {l.productUrl && (
+                  <a href={l.productUrl} target="_blank" rel="noopener noreferrer"
+                     className="shrink-0 text-primary hover:underline" aria-label="Open product">
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+                <button
+                  onClick={() => removeLive(l.productId)}
+                  disabled={liveBusy}
+                  title="Remove from your Walmart cart"
+                  aria-label={`Remove ${l.product || l.productId} from Walmart cart`}
+                  className="shrink-0 p-0.5 rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {liveCart && liveCart.length > 0 && liveExec && (
+          <p className="text-[11px] text-muted-foreground/60">Read via {execLabel(liveExec)}.</p>
+        )}
+        {liveCartState === 'error' && liveMsg && (
+          <p className="text-[11px] text-destructive">{liveMsg.text}</p>
+        )}
+      </section>
 
       {/* Empty state */}
       {items.length === 0 && (

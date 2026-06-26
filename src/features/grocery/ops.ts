@@ -534,7 +534,10 @@ export async function applyObservedCart(
 ): Promise<{ ok: boolean; inCart: number; unknown: string[] }> {
   const carts = await loadCarts();
   const cart = carts?.carts.find(c => c.retailer === retailer);
-  if (!carts || !cart) return { ok: false, inCart: 0, unknown: [] };
+  // No built cart for this retailer → nothing to reconcile. That's not an error
+  // (a live-cart sync may run with no build present), so succeed as a no-op
+  // rather than 404 — also stops the extension's cart sync flashing ERR.
+  if (!carts || !cart) return { ok: true, inCart: 0, unknown: observed.map(o => String(o.productId)).filter(Boolean) };
 
   const obs = new Set(observed.map(o => String(o.productId)).filter(Boolean));
   const cartProductIds = new Set(cart.items.map(m => m.productId).filter(Boolean) as string[]);
@@ -547,6 +550,79 @@ export async function applyObservedCart(
   await saveCarts(carts);
   const unknown = [...obs].filter(pid => !cartProductIds.has(pid));
   return { ok: true, inCart, unknown };
+}
+
+/** Adopt a product seen in the live Walmart cart onto the grocery list as
+ *  already-in-cart, in one shot: ensure a list item exists, pin the exact
+ *  product (so reorders resolve to it), and add/update a Walmart cart line with
+ *  addedQty satisfied. Optionally promote it to a staple. Lets the user capture
+ *  "I already put this in my Walmart cart" with a single tap. */
+export async function adoptWalmartCartLine(input: {
+  productId: string;
+  product: string;
+  productUrl?: string;
+  price?: string;
+  qty?: number;
+  asStaple?: boolean;
+  category?: string;
+}): Promise<{ ok: boolean; itemId: string; staple?: Staple }> {
+  const name = String(input.product ?? '').trim();
+  const productId = String(input.productId ?? '').trim();
+  if (!name || !productId) return { ok: false, itemId: '' };
+  const norm = normalizeName(name);
+  const qty = input.qty && input.qty > 0 ? input.qty : 1;
+
+  const [grocery, categoryMap] = await Promise.all([loadGrocery(), loadCategoryMap()]);
+
+  // 1) Find or create the list item (reuse an existing unchecked match).
+  let item = grocery.items.find(i => normalizeName(i.name) === norm && !i.checked);
+  if (!item) {
+    const explicit = input.category && (DEFAULT_CATEGORIES as readonly string[]).includes(input.category) ? input.category : null;
+    const [cat, confirmed] = explicit ? [explicit, true] : resolveCategory(name, categoryMap);
+    item = {
+      id: makeItemId(name), name, category: cat, categoryConfirmed: confirmed,
+      checked: false, addedAt: new Date().toISOString(), source: 'manual',
+    };
+    grocery.items.push(item);
+  }
+  if (input.asStaple) item.staple = true;
+  await saveGrocery(grocery);
+
+  // 2) Pin the exact product so a future build reorders this same item.
+  await setPin(name, { retailer: 'walmart', productId, product: name, productUrl: input.productUrl });
+
+  // 3) Upsert a Walmart cart line, marked already-in-cart (addedQty = qty).
+  const carts: CartsData = (await loadCarts()) ?? { builtAt: new Date().toISOString(), carts: [] };
+  let cart = carts.carts.find(c => c.retailer === 'walmart');
+  if (!cart) { cart = { retailer: 'walmart', label: RETAILER_LABELS.walmart, items: [], unmatched: [] }; carts.carts.push(cart); }
+  let line = cart.items.find(m => m.itemId === item!.id || m.productId === productId);
+  if (!line) {
+    line = { itemId: item.id, name, product: name, productId, productUrl: input.productUrl, price: input.price, qty, confidence: 'high', source: 'reorder', status: 'ok' };
+    cart.items.push(line);
+  } else {
+    line.productId = productId; line.product = name;
+    if (input.productUrl) line.productUrl = input.productUrl;
+    if (input.price) line.price = input.price;
+  }
+  line.qty = line.qty ?? qty;
+  line.addedQty = line.qty; // it's already in the real cart
+  cart.cartUrl = rebuildCartUrl(cart);
+  carts.builtAt = new Date().toISOString();
+  await saveCarts(carts);
+
+  // 4) Optionally make it a staple (stocked — it's en route).
+  let staple: Staple | undefined;
+  if (input.asStaple) {
+    const staples = await loadStaples();
+    if (!staples.some(s => normalizeName(s.name) === norm)) {
+      const [cat] = resolveCategory(name, categoryMap);
+      staple = { id: makeItemId(name), name, category: item.category || cat, status: 'stocked' };
+      staples.push(staple);
+      await saveStaples(staples);
+    }
+  }
+
+  return { ok: true, itemId: item.id, staple };
 }
 
 /* ── Out-of-stock substitution ─────────────────────────────────────────────

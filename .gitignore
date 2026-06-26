@@ -22,6 +22,7 @@ src/content/grocery/.*-log
 src/content/grocery/.categorized.json
 src/content/grocery/.scan-results.json
 src/content/grocery/cart-request.json
+src/content/grocery/.walmart-commands.json
 
 
 # environment variables

@@ -29,7 +29,11 @@ export function hasProfile(id: string): boolean {
 
 const NAV_TIMEOUT = 45_000;
 
-async function launchProfile(id: string): Promise<BrowserContext> {
+/** Launch the persistent Chrome profile for an account (real Chrome first for
+ *  bot-check resilience, bundled Chromium as fallback). Exported so other
+ *  features (e.g. the grocery Walmart session fallback) can reuse the same
+ *  signed-in profile rather than spinning a fresh, detectable context. */
+export async function launchProfile(id: string): Promise<BrowserContext> {
   const { chromium } = await import('playwright');
   const dir = profileDir(id);
   mkdirSync(dir, { recursive: true });

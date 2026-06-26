@@ -1,7 +1,12 @@
 // Typed client for the Grocery stack — the only place that knows the grocery
 // API routes' URLs and payload shapes. Components call named operations.
 import { apiCall } from '@/lib/client/stack-client';
-import type { GroceryState, GroceryItem, Retailer } from '@/features/grocery/types';
+import type { GroceryState, GroceryItem, Retailer, WalmartOpResult } from '@/features/grocery/types';
+
+/** On-demand Walmart cart ops (ADR 0001) — routed through the extension when
+ *  present, the local session otherwise. Each call hits the single front door. */
+const walmartOp = (op: string, body: Record<string, unknown> = {}) =>
+  apiCall<WalmartOpResult>('/api/grocery/walmart/command', { method: 'POST', body: { op, ...body } }) as Promise<WalmartOpResult>;
 
 export const groceryClient = {
   state: () => apiCall<GroceryState>('/api/grocery') as Promise<GroceryState>,
@@ -65,6 +70,27 @@ export const groceryClient = {
   /* checkout */
   checkout: (body: { retailer?: Retailer; itemIds?: string[] }) =>
     apiCall('/api/grocery/checkout', { method: 'POST', body }),
+
+  /* on-demand Walmart cart control */
+  walmart: {
+    getCart: () => walmartOp('get-cart'),
+    getHistory: () => walmartOp('get-history'),
+    getDeliveries: () => walmartOp('get-deliveries'),
+    addItem: (productId: string, qty?: number) => walmartOp('add-item', { productId, qty }),
+    /** Add many products in one navigation (one affiliate deep link). */
+    addItems: (items: { productId: string; qty?: number }[]) => walmartOp('add-item', { items }),
+    removeItem: (productId: string) => walmartOp('remove-item', { productId }),
+    /** Capture a live-cart product onto the grocery list as already-in-cart,
+     *  optionally as a staple. Not a channel op — a plain grocery mutation. */
+    adopt: (
+      line: { productId: string; product?: string; productUrl?: string; price?: string; qty?: number },
+      asStaple = false,
+    ) =>
+      apiCall<{ ok: boolean; itemId: string }>('/api/grocery/walmart/adopt', {
+        method: 'POST',
+        body: { ...line, asStaple },
+      }) as Promise<{ ok: boolean; itemId: string }>,
+  },
 
   /* agent jobs */
   buildCarts: (itemIds?: string[]) =>
