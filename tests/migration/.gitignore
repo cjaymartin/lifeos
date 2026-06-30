@@ -1,0 +1,4 @@
+# Per-run artifacts — the baseline (screenshots/baseline, baseline.json, PLAN.md)
+# is committed as the reference; verify output is regenerated each run.
+screenshots/verify/
+verify-results.json
