@@ -2,9 +2,10 @@ import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import { vaultDir, vaultPath } from '@/lib/content-paths';
 import { runAgentCapture } from '@/lib/jobs/runner';
 
-const RECIPES_DIR = join(process.cwd(), 'src/content/recipes');
+const RECIPES_DIR = vaultPath('recipes');
 
 async function loadRecipes(): Promise<string> {
   try {
@@ -54,7 +55,7 @@ ${historyText ? `Conversation so far:\n${historyText}\n\n` : ''}User: ${message}
 Instructions:
 - Answer conversationally and helpfully about any recipe topic.
 - For scaling or unit conversion questions, show the math clearly.
-- If the user asks to add a new recipe, create the file at src/content/recipes/<slug>.md using this exact frontmatter format:
+- If the user asks to add a new recipe, create the file at ${RECIPES_DIR}/<slug>.md using this exact frontmatter format:
   ---
   title: "<Title>"
   slug: "<slug>"
@@ -85,6 +86,9 @@ Instructions:
       prompt,
       allowedTools: ['Write', 'Edit', 'Read'],
       timeoutMs: 60_000,
+      // Recipes live in the vault (outside /app) — without this the Write/Edit
+      // to RECIPES_DIR is silently refused.
+      addDirs: [vaultDir()],
     });
     return new Response(JSON.stringify({ reply }), {
       headers: { 'Content-Type': 'application/json' },

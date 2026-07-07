@@ -2,6 +2,8 @@
 import AppLayout from '@/layouts/AppLayout.astro';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import { vaultPath } from '@/lib/content-paths';
+import { parseNote, noteStem, noteSlug } from '@/lib/markdown-store';
 
 interface Recipe {
   title: string;
@@ -15,40 +17,37 @@ interface Recipe {
   image?: string;
 }
 
-function parseFrontmatter(raw: string): Recipe | null {
-  const match = raw.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return null;
-  const data: Record<string, unknown> = {};
-  for (const line of match[1].split('\n')) {
-    const colon = line.indexOf(': ');
-    if (colon === -1) continue;
-    const key = line.slice(0, colon).trim();
-    const val = line.slice(colon + 2).trim();
-    if (val.startsWith('[')) {
-      try { data[key] = JSON.parse(val); } catch { data[key] = []; }
-    } else if (val.startsWith('"') && val.endsWith('"')) {
-      data[key] = val.slice(1, -1);
-    } else if (val !== '' && !isNaN(Number(val))) {
-      data[key] = Number(val);
-    } else {
-      data[key] = val;
-    }
-  }
-  return data as unknown as Recipe;
-}
+/** "brown-sugar-creami" → "Brown Sugar Creami" — title fallback for hand notes. */
+const titleize = (stem: string): string =>
+  stem.replace(/-+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || 'Untitled';
 
-const contentDir = join(process.cwd(), 'src/content/recipes');
+// The filename is the recipe's identity: the card links to /recipes/<filename>,
+// which [slug].astro reads back as <filename>.md. So a recipe hand-created in
+// Obsidian just works — no frontmatter slug required. Missing fields degrade
+// gracefully rather than dropping the recipe.
+const contentDir = vaultPath('recipes');
 let recipes: Recipe[] = [];
 try {
-  const files = (await readdir(contentDir)).filter(f => f.endsWith('.md'));
-  const parsed = await Promise.all(
+  const files = (await readdir(contentDir)).filter(f => f.endsWith('.md') && !f.startsWith('.'));
+  recipes = await Promise.all(
     files.map(async f => {
       const raw = await readFile(join(contentDir, f), 'utf-8');
-      return parseFrontmatter(raw);
+      const { data } = parseNote<Partial<Recipe>>(raw);
+      const slug = noteSlug(noteStem(f));
+      return {
+        title: (data.title ?? '').toString().trim() || titleize(noteStem(f)),
+        slug,
+        tags: Array.isArray(data.tags) ? data.tags : [],
+        prepTime: (data.prepTime ?? '').toString(),
+        cookTime: (data.cookTime ?? '').toString(),
+        servings: Number(data.servings) || 0,
+        dateAdded: (data.dateAdded ?? '').toString(),
+        source: (data.source ?? '').toString(),
+        image: data.image,
+      } as Recipe;
     })
   );
-  recipes = (parsed.filter(Boolean) as Recipe[])
-    .sort((a, b) => b.dateAdded.localeCompare(a.dateAdded));
+  recipes.sort((a, b) => (b.dateAdded ?? '').localeCompare(a.dateAdded ?? ''));
 } catch {}
 
 const title = 'Recipes';

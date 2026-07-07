@@ -13,13 +13,13 @@ You build links only. **Never** place, submit, or check out an order; never log 
 
 ## Step 1 — Read state
 
-- `src/content/grocery/grocery.json` — work only with items where `"checked": false`. If none, write carts.json with an empty carts array and stop.
+- The grocery-list notes in `$LIFEOS_VAULT_DIR/grocery/list/` (default `~/obsidian/lifeos/grocery/list/`) — one `<id>.md` per item, fields in YAML frontmatter, `id` = filename minus `.md`. Work only with items where `checked: false`. If none, write carts.json with an empty carts array and stop.
 - `src/content/grocery/cart-request.json` (may not exist) — when present, `{ "itemIds": [...] }` is your work list: build ONLY for those item ids (intersected with the unchecked items). When absent, build for all unchecked items. The server resolves items with product-map entries instantly before spawning you, so your work list is normally just the unknown items.
 - `src/content/grocery/carts.json` (may not exist) — the CURRENT cart state. You MERGE into it, never replace it wholesale (Step 3).
 - Skip any item whose existing cart line is already fully added (`addedQty >= qty`) — it's in the user's real retailer cart; re-matching it would cause double-adds.
 - `src/content/grocery/product-map.json` (may not exist) — the product memory: `{ "<normalized item name>": { "retailer", "productId", "product", "productUrl", "pinned"? } }`. Entries with `"pinned": true` were chosen by the user.
 - `src/content/grocery/order-history.json` (may not exist) — past-purchased products captured from Walmart order history: `{ "syncedAt", "products": [{ "retailer", "productId", "product", "productUrl", "lastOrdered"? }] }`. This is your **local reorder catalog** — grep it instead of the web whenever you can.
-- `src/content/grocery/staples.json` — staple names help disambiguate.
+- The staple notes in `$LIFEOS_VAULT_DIR/grocery/staples/` (default `~/obsidian/lifeos/grocery/staples/`) — one `<id>.md` per staple, fields in YAML frontmatter — staple names help disambiguate.
 
 ## Step 2 — Match each item, in strict priority order
 
@@ -71,7 +71,7 @@ Cart links:
       "cartUrl": "https://affil.walmart.com/cart/addToCart?items=123456789,987654321_2",
       "items": [
         {
-          "itemId": "<id from grocery.json>",
+          "itemId": "<id from the grocery-list note>",
           "name": "<item name from the list>",
           "product": "Fairlife 2% Ultra-Filtered Milk, 52 fl oz",
           "price": "$4.12",
@@ -90,7 +90,7 @@ Cart links:
 }
 ```
 
-- `itemId` must be the exact `id` from grocery.json — the checkout flow uses it.
+- `itemId` must be the exact `id` from the grocery-list note (filename minus `.md`) — the checkout flow uses it.
 - `productId` is required on every match (Walmart item id / Amazon ASIN) — the UI rebuilds `cartUrl` from these when the user removes items.
 - `status` defaults to `"ok"` when absent. An `"out_of_stock"` line carries `alternatives` (and optionally `substituted: true`) — see the out-of-stock rule in Step 2. Don't put out-of-stock items in `unmatched`.
 - `addedQty` is UI-managed (tracks what the user already pushed to the real retailer cart). Never invent it — but if the **previous** carts.json has a line with the same `productId` carrying `addedQty`, copy it over so a rebuild doesn't cause double-adds.
@@ -100,4 +100,4 @@ Cart links:
 
 Write `src/content/grocery/product-map.json`: merge every confirmed match into the existing map keyed by lowercase item name (`{ "fairlife 2% milk": { "retailer": "walmart", "productId": "123456789", "product": "...", "productUrl": "..." } }`). Preserve entries for items not on this run's list. Don't store `low`-confidence guesses. **Never overwrite or remove an entry with `"pinned": true`** — those belong to the user (filling in a missing `product` title on a pinned entry is the only allowed edit).
 
-Do **not** modify grocery.json or any other file.
+Do **not** modify the grocery-list or staple notes, or any other file.

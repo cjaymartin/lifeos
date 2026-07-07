@@ -15,6 +15,7 @@ import { join } from 'path';
 import { readFile } from 'fs/promises';
 import { runAgentCapture } from '@/lib/jobs/runner';
 import { loadStackContent } from '@/lib/content-store';
+import { vaultPath } from '@/lib/content-paths';
 import { stacks, loadChatGuide } from '@/features';
 import { runStackChat, type Proposal, type StackChatResult } from './stack-agent';
 
@@ -116,11 +117,16 @@ ${historyText}User question: ${message}`;
 
 /** Load the dashboard's own content: today's briefing + the widget registry. */
 async function loadDashboardContent(): Promise<string> {
-  const [daily, widgets] = await Promise.all([
+  const [daily, briefing, widgets] = await Promise.all([
+    // Machine-store daily reference data (recycling schedule, etc.)
     loadStackContent('daily'),
+    // The morning briefing now lives as a vault note.
+    readFile(vaultPath('daily', 'today.md'), 'utf-8').catch(() => ''),
     readFile(join(process.cwd(), 'src/content/widgets/registry.json'), 'utf-8').catch(() => ''),
   ]);
-  return widgets ? `${daily}\n\n---\n\n### widgets/registry.json\n${widgets}` : daily;
+  const parts = [briefing ? `### daily/today.md\n${briefing}` : '', daily].filter(Boolean);
+  const content = parts.join('\n\n---\n\n');
+  return widgets ? `${content}\n\n---\n\n### widgets/registry.json\n${widgets}` : content;
 }
 
 /** Run one area's page-agent. Returns null for an unknown target id. */
@@ -138,7 +144,7 @@ async function runTarget(
     const result = await runStackChat({
       stackId: 'dashboard', stackLabel: 'Dashboard', message, history, approved,
       contentOverride, chatGuideOverride,
-      contentDir: join(process.cwd(), 'src/content/daily'),
+      contentDir: vaultPath('daily'),
     });
     return { id, label: 'Dashboard', result };
   }

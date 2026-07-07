@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { stat } from 'fs/promises';
-import { GROCERY_FILE, CARTS_FILE } from '@/features/grocery/ops';
+import { GROCERY_DIR, CARTS_FILE } from '@/features/grocery/ops';
 import { isJobRunning } from '@/features/grocery/jobs';
 
 async function mtime(path: string): Promise<number | null> {
@@ -16,7 +16,7 @@ export const GET: APIRoute = async ({ cookies }) => {
     isJobRunning('build-carts'),
     isJobRunning('purchase-scan'),
     isJobRunning('categorize'),
-    mtime(GROCERY_FILE),
+    mtime(GROCERY_DIR),
     mtime(CARTS_FILE),
   ]);
 

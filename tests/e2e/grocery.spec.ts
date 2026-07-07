@@ -1,14 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { readSandboxJson, writeSandboxJson } from './helpers';
+import { readSandboxJson, writeSandboxJson, readSandboxVaultNotes } from './helpers';
 
 test.describe('grocery stack', () => {
-  test('renders the list from grocery.json', async ({ page }) => {
-    const grocery = readSandboxJson<{ items: any[] }>('src/content/grocery/grocery.json');
+  test('renders the list from the vault', async ({ page }) => {
+    const items = readSandboxVaultNotes<any>('grocery/list');
     await page.goto('/grocery');
     await expect(page.locator('h1', { hasText: 'Groceries' })).toBeVisible();
     await expect(page.getByPlaceholder(/add an item/i)).toBeVisible();
 
-    const unchecked = grocery.items.find((i) => !i.checked);
+    const unchecked = items.find((i) => !i.checked);
     if (unchecked) {
       await expect(page.getByText(unchecked.name).first()).toBeVisible();
     }
@@ -23,18 +23,18 @@ test.describe('grocery stack', () => {
 
     await expect(page.getByText(name).first()).toBeVisible();
 
-    // Persisted to the (sandboxed) content store, not just optimistic state
+    // Persisted to the (sandboxed) vault, not just optimistic state
     await expect
       .poll(() => {
-        const grocery = readSandboxJson<{ items: any[] }>('src/content/grocery/grocery.json');
-        return grocery.items.some((i) => i.name === name);
+        const items = readSandboxVaultNotes<any>('grocery/list');
+        return items.some((i) => i.name === name);
       })
       .toBe(true);
   });
 
   test('checking an item toggles it', async ({ page }) => {
-    const grocery = readSandboxJson<{ items: any[] }>('src/content/grocery/grocery.json');
-    const target = grocery.items.find((i) => !i.checked && !i.staple);
+    const items = readSandboxVaultNotes<any>('grocery/list');
+    const target = items.find((i) => !i.checked && !i.staple);
     test.skip(!target, 'no unchecked non-staple item in fixture data');
 
     await page.goto('/grocery');
@@ -42,8 +42,8 @@ test.describe('grocery stack', () => {
 
     await expect
       .poll(() => {
-        const after = readSandboxJson<{ items: any[] }>('src/content/grocery/grocery.json');
-        return after.items.find((i) => i.id === target!.id)?.checked;
+        const after = readSandboxVaultNotes<any>('grocery/list');
+        return after.find((i) => i.id === target!.id)?.checked;
       })
       .toBe(true);
   });

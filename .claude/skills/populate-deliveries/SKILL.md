@@ -1,11 +1,15 @@
 ---
 name: populate-deliveries
-description: Scan Gmail for upcoming deliveries (packages, food/grocery, pharmacy) from the last 30 days, dedupe to one entry per shipment, and write src/content/deliveries/deliveries.json.
+description: Scan Gmail for upcoming deliveries (packages, food/grocery, pharmacy) from the last 30 days, dedupe to one entry per shipment, and write one Markdown note per delivery into the vault's deliveries/ folder.
 ---
 
 # Populate Deliveries
 
-Scan Gmail for delivery-related emails, consolidate them into one entry per shipment, and write `src/content/deliveries/deliveries.json`. Runs standalone (widget refresh button) and is also invoked as a step of `/populate-daily`.
+Scan Gmail for delivery-related emails, consolidate them into one entry per shipment, and write **one Markdown note per delivery** into the vault's `deliveries/` folder. Runs standalone (widget refresh button) and is also invoked as a step of `/populate-daily`.
+
+## Where the notes live
+
+Delivery notes are human-facing content in the Obsidian vault, **not** in `src/content/`. The vault is at `$LIFEOS_VAULT_DIR/deliveries/` (when that env var is set) or `~/obsidian/lifeos/deliveries/` by default. Each delivery is its own file `<id>.md` with YAML frontmatter. The dismissed list stays as machine state at `src/content/deliveries/dismissed.json`.
 
 ## Scope
 
@@ -21,7 +25,7 @@ A "delivery" is anything physical arriving at the house:
 
 ## Step 1 — Read existing state
 
-1. Read `src/content/deliveries/deliveries.json` if it exists — reuse stable `id`s and any details (item names, tracking URLs) that new emails don't repeat.
+1. Read the existing `*.md` notes in the vault's `deliveries/` folder if any exist — reuse stable `id`s (the filename minus `.md`) and any details (item names, tracking URLs) that new emails don't repeat.
 2. Read `src/content/deliveries/dismissed.json` if it exists. **Never include a delivery whose `id` is in the dismissed list**, even if new emails about it arrive. Matching is exact-id only — a dismissed id must never suppress a *different* order, which is why ids have to be unique per order (see Step 3).
 
 ## Step 2 — Search Gmail (last 30 days)
@@ -49,23 +53,27 @@ One shipment generates many emails (ordered → shipped → out for delivery →
 
 ## Step 4 — Build each entry
 
-```json
-{
-  "id": "1Z999AA10123456784",
-  "vendor": "Amazon",
-  "item": "USB-C cables (2-pack)",
-  "category": "package",
-  "carrier": "UPS",
-  "trackingNumber": "1Z999AA10123456784",
-  "trackingUrl": "https://www.ups.com/track?tracknum=1Z999AA10123456784",
-  "status": "shipped",
-  "eta": "2026-06-05",
-  "etaWindow": "by 9 PM",
-  "deliveredAt": null,
-  "emailThreadId": "<gmail thread id>",
-  "emailUrl": "https://mail.google.com/mail/u/0/#all/<gmail thread id>"
-}
+Each delivery is one Markdown note, filename `<id>.md`, with the fields as YAML frontmatter:
+
+```markdown
+---
+id: "1Z999AA10123456784"
+vendor: "Amazon"
+item: "USB-C cables (2-pack)"
+category: "package"
+carrier: "UPS"
+trackingNumber: "1Z999AA10123456784"
+trackingUrl: "https://www.ups.com/track?tracknum=1Z999AA10123456784"
+status: "shipped"
+eta: "2026-06-05"
+etaWindow: "by 9 PM"
+deliveredAt: null
+emailThreadId: "<gmail thread id>"
+emailUrl: "https://mail.google.com/mail/u/0/#all/<gmail thread id>"
+---
 ```
+
+The body may be left empty. Omit optional fields (or set to `null`) when genuinely unknown — do not invent values.
 
 Field notes:
 
@@ -88,15 +96,10 @@ Drop entries that are:
 - Dismissed (in `dismissed.json`)
 - Older than the 30-day window with no activity and no future ETA (stale/abandoned)
 
-## Step 6 — Write the file
+## Step 6 — Write the notes
 
-Write `src/content/deliveries/deliveries.json`:
+Write one `<id>.md` note per surviving delivery into the vault's `deliveries/` folder (`$LIFEOS_VAULT_DIR/deliveries/`, default `~/obsidian/lifeos/deliveries/`).
 
-```json
-{
-  "lastSynced": "<current ISO timestamp, America/New_York>",
-  "deliveries": [ ...sorted by ETA ascending, unknown ETAs last, delivered at the end... ]
-}
-```
-
-Always write the file, even if the list is empty (`"deliveries": []`) — the UI uses the file's mtime to detect sync completion.
+- Overwrite the note for an id you're updating.
+- **Delete** the `<id>.md` note for any delivery pruned in Step 5 (delivered >2 days ago, dismissed, or stale) so it disappears from the UI.
+- There is no separate manifest or timestamp file — the app derives "last synced" from the newest note's mtime, so simply writing the notes is enough.

@@ -1,9 +1,10 @@
 // QA: dashboard composition & widgets — see tests/qa/cases/dashboard.md
-import { startQA, expectVisible, readSandboxJson, BASE } from './qa-lib.mjs';
+import { startQA, expectVisible, readSandboxJson, readSandboxVaultNote, BASE } from './qa-lib.mjs';
 
 const qa = await startQA('dashboard');
 const registry = readSandboxJson('src/content/widgets/registry.json');
-const daily = readSandboxJson('src/content/daily/today.json');
+// The morning briefing is now a single vault note (frontmatter).
+const daily = readSandboxVaultNote('daily/today.md');
 
 await qa.check('DASH-1', 'renders title, greeting, and refresh button', async (page) => {
   await page.goto(BASE + '/');

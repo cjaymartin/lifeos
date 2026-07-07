@@ -2,14 +2,14 @@
 import AppLayout from '@/layouts/AppLayout.astro';
 import RecipeDetail from '@/components/RecipeDetail';
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { vaultPath } from '@/lib/content-paths';
+import { parseNote, noteStem } from '@/lib/markdown-store';
 import type { RecipeSection } from '@/components/RecipeDetail';
 
 const { slug } = Astro.params;
 
 interface RecipeMeta {
   title: string;
-  slug: string;
   source: string;
   servings: number;
   prepTime: string;
@@ -19,45 +19,42 @@ interface RecipeMeta {
   image?: string;
 }
 
-function parseFrontmatter(raw: string): { data: RecipeMeta; sections: RecipeSection[] } | null {
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) return null;
+/** "brown-sugar-creami" → "Brown Sugar Creami" — title fallback for hand notes. */
+const titleize = (stem: string): string =>
+  stem.replace(/-+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || 'Untitled';
 
-  const data: Record<string, unknown> = {};
-  for (const line of match[1].split('\n')) {
-    const colon = line.indexOf(': ');
-    if (colon === -1) continue;
-    const key = line.slice(0, colon).trim();
-    const val = line.slice(colon + 2).trim();
-    if (val.startsWith('[')) {
-      try { data[key] = JSON.parse(val); } catch { data[key] = []; }
-    } else if (val.startsWith('"') && val.endsWith('"')) {
-      data[key] = val.slice(1, -1);
-    } else if (val !== '' && !isNaN(Number(val))) {
-      data[key] = Number(val);
-    } else {
-      data[key] = val;
-    }
-  }
-
+/** Split a Markdown body into `## `-headed sections (the recipe's steps/ingredients). */
+function parseSections(body: string): RecipeSection[] {
   const sections: RecipeSection[] = [];
-  for (const part of match[2].split(/^## /m)) {
+  for (const part of body.split(/^## /m)) {
     if (!part.trim()) continue;
     const nl = part.indexOf('\n');
     if (nl === -1) continue;
     sections.push({ heading: part.slice(0, nl).trim(), content: part.slice(nl + 1).trim() });
   }
-
-  return { data: data as unknown as RecipeMeta, sections };
+  return sections;
 }
 
+// The filename is the recipe's identity ([slug].md). A recipe hand-authored in
+// Obsidian just works — no frontmatter required. Missing fields degrade to
+// readable defaults (title ← titleized filename) rather than 404ing the note.
 let recipe: RecipeMeta | null = null;
 let sections: RecipeSection[] = [];
 
 try {
-  const raw = await readFile(join(process.cwd(), `src/content/recipes/${slug}.md`), 'utf-8');
-  const parsed = parseFrontmatter(raw);
-  if (parsed) { recipe = parsed.data; sections = parsed.sections; }
+  const raw = await readFile(vaultPath('recipes', `${slug}.md`), 'utf-8');
+  const { data, body } = parseNote<Partial<RecipeMeta>>(raw);
+  recipe = {
+    title: (data.title ?? '').toString().trim() || titleize(noteStem(slug ?? '')),
+    source: (data.source ?? '').toString(),
+    servings: Number(data.servings) || 0,
+    prepTime: (data.prepTime ?? '').toString(),
+    cookTime: (data.cookTime ?? '').toString(),
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    dateAdded: (data.dateAdded ?? '').toString(),
+    image: data.image,
+  };
+  sections = parseSections(body);
 } catch {}
 
 if (!recipe) return Astro.redirect('/recipes');

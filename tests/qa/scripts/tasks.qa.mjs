@@ -3,10 +3,13 @@
 // Mutations (add/complete/edit/delete) live in the opt-in tasks-mutations area,
 // which runs against an in-memory fake provider (LIFEOS_FAKE_TASKS=1) — never
 // the real Todoist account (NIM-7). This area stays read-only.
-import { startQA, expectVisible, readSandboxJson, BASE } from './qa-lib.mjs';
+import { startQA, expectVisible, readSandboxJson, readSandboxVaultNotes, BASE } from './qa-lib.mjs';
 
 const qa = await startQA('tasks');
-const data = readSandboxJson('src/content/tasks/tasks.json');
+// The mirror is now split: active/completed tasks are per-note vault Markdown,
+// the relational reference data (projects/labels) is in machine meta.json.
+const meta = readSandboxJson('src/content/tasks/meta.json');
+const data = { ...meta, tasks: readSandboxVaultNotes('tasks/active') };
 const open = (data.tasks ?? []).filter((t) => !t.completed);
 
 await qa.check('TASK-1', 'page renders with view navigation and sync status', async (page) => {
@@ -48,8 +51,9 @@ await qa.check('TASK-4', 'Completed view renders the completed log', async (page
   await page.goto(BASE + '/tasks');
   await page.getByRole('button', { name: 'Completed' }).click();
   await page.waitForTimeout(800);
-  const completed = readSandboxJson('src/content/tasks/completed.json');
-  const recent = (completed.completed ?? completed.tasks ?? [])[0];
+  const completed = readSandboxVaultNotes('tasks/completed');
+  const recent = [...completed].sort((a, b) =>
+    String(b.completedAt).localeCompare(String(a.completedAt)))[0];
   if (recent?.content) {
     await expectVisible(page.getByText(recent.content).first(), 5000);
   }

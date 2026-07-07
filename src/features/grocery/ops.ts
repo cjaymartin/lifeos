@@ -1,8 +1,10 @@
 // Server-only helpers for the Grocery stack — do NOT import from client
 // components; browser-safe types/constants are in src/lib/grocery-types.ts.
-import { readFile, unlink } from 'fs/promises';
+import { readFile, stat, unlink } from 'fs/promises';
 import { join } from 'path';
 import { writeJson } from '@/lib/content-store';
+import { readCollection, writeCollection, noteStem } from '@/lib/markdown-store';
+import { contentPath, vaultPath } from '@/lib/content-paths';
 import type {
   CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, OrderHistory, OrderedProduct, ProductRef, PurchaseRecord, Retailer, Staple,
 } from '@/features/grocery/types';
@@ -10,9 +12,12 @@ import { buildAddToCartUrl, normalizeName, RETAILER_LABELS, DEFAULT_CATEGORIES }
 
 export type * from '@/features/grocery/types';
 
-const DIR = join(process.cwd(), 'src/content/grocery');
-export const GROCERY_FILE = join(DIR, 'grocery.json');
-export const STAPLES_FILE = join(DIR, 'staples.json');
+const DIR = contentPath('grocery');
+// The grocery list + staples are human content — one Markdown note per item in
+// the vault. Everything else here (carts, purchases, product-map, category-map,
+// order-history, dot-files) is machine/derived state and stays JSON in DIR.
+export const GROCERY_DIR = vaultPath('grocery', 'list');
+export const STAPLES_DIR = vaultPath('grocery', 'staples');
 export const CARTS_FILE = join(DIR, 'carts.json');
 export const PURCHASES_FILE = join(DIR, 'purchases.json');
 export const PRODUCT_MAP_FILE = join(DIR, 'product-map.json');
@@ -37,21 +42,73 @@ async function readJson<T>(path: string): Promise<T | null> {
   try { return JSON.parse(await readFile(path, 'utf-8')) as T; } catch { return null; }
 }
 
+/** Newest note mtime in a collection dir as an ISO string ('' if empty). */
+async function newestMtime(paths: string[]): Promise<string> {
+  let newest = '';
+  for (const p of paths) {
+    try {
+      const m = (await stat(p)).mtime.toISOString();
+      if (m > newest) newest = m;
+    } catch {}
+  }
+  return newest;
+}
+
+/** Turn a filename stem ("whole-milk") into a display name ("Whole Milk"). */
+const titleizeSlug = (stem: string): string =>
+  stem.replace(/-+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || 'Untitled';
+
+/** Coerce a note (possibly hand-authored in Obsidian) into a complete GroceryItem.
+ *  Missing id/name fall back to the filename so a note dropped into the vault by
+ *  hand still loads; required flags get sane defaults. */
+function normalizeGroceryNote(data: Partial<GroceryItem>, file: string): GroceryItem {
+  const stem = noteStem(file);
+  return {
+    category: 'Other',
+    checked: false,
+    source: 'manual',
+    addedAt: '',
+    ...data,
+    id: data.id || stem,
+    name: (data.name ?? '').trim() || titleizeSlug(stem),
+  } as GroceryItem;
+}
+
+/** Coerce a note into a complete Staple, filling id/name/defaults for hand notes. */
+function normalizeStapleNote(data: Partial<Staple>, file: string): Staple {
+  const stem = noteStem(file);
+  return {
+    category: 'Other',
+    status: 'stocked',
+    ...data,
+    id: data.id || stem,
+    name: (data.name ?? '').trim() || titleizeSlug(stem),
+  } as Staple;
+}
+
 export async function loadGrocery(): Promise<GroceryData> {
-  return (await readJson<GroceryData>(GROCERY_FILE)) ?? { lastUpdated: '', items: [] };
+  const notes = await readCollection<Partial<GroceryItem>>(GROCERY_DIR);
+  const items = notes
+    .map(n => normalizeGroceryNote(n.data, n.file))
+    .sort((a, b) => (a.addedAt ?? '').localeCompare(b.addedAt ?? '') || (a.id ?? '').localeCompare(b.id ?? ''));
+  const lastUpdated = await newestMtime(notes.map(n => n.path));
+  return { lastUpdated, items };
 }
 
 export async function saveGrocery(data: GroceryData): Promise<void> {
   data.lastUpdated = new Date().toISOString();
-  await writeJson(GROCERY_FILE, data);
+  await writeCollection(GROCERY_DIR, data.items, i => i.name, { id: i => i.id });
 }
 
 export async function loadStaples(): Promise<Staple[]> {
-  return (await readJson<{ staples: Staple[] }>(STAPLES_FILE))?.staples ?? [];
+  const notes = await readCollection<Partial<Staple>>(STAPLES_DIR);
+  return notes
+    .map(n => normalizeStapleNote(n.data, n.file))
+    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '') || (a.id ?? '').localeCompare(b.id ?? ''));
 }
 
 export async function saveStaples(staples: Staple[]): Promise<void> {
-  await writeJson(STAPLES_FILE, { staples });
+  await writeCollection(STAPLES_DIR, staples, s => s.name, { id: s => s.id });
 }
 
 export async function loadCarts(): Promise<CartsData | null> {

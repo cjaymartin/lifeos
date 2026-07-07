@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
 import { requireSession } from '@/lib/auth';
 import { stat } from 'fs/promises';
-import { join } from 'path';
 import { isPopulateDailyRunning } from '@/features/daily/jobs';
+import { vaultPath } from '@/lib/content-paths';
 
-const DATA = join(process.cwd(), 'src/content/daily/today.json');
+const DATA = vaultPath('daily', 'today.md');
 
 export const GET: APIRoute = async ({ cookies }) => {
   const denied = requireSession(cookies);

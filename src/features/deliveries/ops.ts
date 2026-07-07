@@ -1,14 +1,18 @@
 // Server-only helpers for the Deliveries stack — do NOT import from client
 // components; browser-safe types/constants are in src/lib/deliveries-types.ts.
 import { readFile, stat } from 'fs/promises';
-import { join } from 'path';
 import { writeJson } from '@/lib/content-store';
-import type { DeliveriesData } from '@/features/deliveries/types';
+import { readCollection } from '@/lib/markdown-store';
+import { contentPath, vaultPath } from '@/lib/content-paths';
+import type { DeliveriesData, Delivery } from '@/features/deliveries/types';
 
 export type * from '@/features/deliveries/types';
 
-export const DELIVERIES_FILE = join(process.cwd(), 'src/content/deliveries/deliveries.json');
-export const DISMISSED_FILE = join(process.cwd(), 'src/content/deliveries/dismissed.json');
+// Deliveries are human-facing content — one Markdown note per delivery in the
+// vault. The dismissed list is machine state (UI toggle) and stays JSON in the
+// machine store.
+export const DELIVERIES_DIR = vaultPath('deliveries');
+export const DISMISSED_FILE = contentPath('deliveries', 'dismissed.json');
 
 export interface Dismissal { id: string; dismissedAt: string }
 
@@ -17,14 +21,10 @@ export async function saveDismissed(dismissed: Dismissal[]): Promise<void> {
   await writeJson(DISMISSED_FILE, { dismissed });
 }
 
-/** Read deliveries.json with dismissed entries filtered out. Null if no sync has run yet. */
+/** Read the delivery notes with dismissed entries filtered out. Null if no sync has run yet. */
 export async function loadDeliveries(): Promise<DeliveriesData | null> {
-  let data: DeliveriesData;
-  try {
-    data = JSON.parse(await readFile(DELIVERIES_FILE, 'utf-8'));
-  } catch {
-    return null;
-  }
+  const notes = await readCollection<Delivery>(DELIVERIES_DIR);
+  if (notes.length === 0) return null;
 
   let dismissed: string[] = [];
   try {
@@ -32,16 +32,18 @@ export async function loadDeliveries(): Promise<DeliveriesData | null> {
     dismissed = (raw.dismissed ?? []).map((d: { id: string }) => d.id);
   } catch {}
 
-  // Use the file's mtime for lastSynced — more reliable than the timestamp
-  // the sync skill writes into the JSON
-  let lastSynced = data.lastSynced;
-  try {
-    lastSynced = (await stat(DELIVERIES_FILE)).mtime.toISOString();
-  } catch {}
+  // lastSynced = newest note mtime — more reliable than a timestamp the sync
+  // skill writes into a field.
+  let lastSynced = new Date(0).toISOString();
+  for (const n of notes) {
+    try {
+      const m = (await stat(n.path)).mtime.toISOString();
+      if (m > lastSynced) lastSynced = m;
+    } catch {}
+  }
 
-  const all = data.deliveries ?? [];
+  const all = notes.map(n => n.data).sort((a, b) => (a.id ?? '').localeCompare(b.id ?? ''));
   return {
-    ...data,
     lastSynced,
     deliveries: all.filter(d => !dismissed.includes(d.id)),
     dismissed: all.filter(d => dismissed.includes(d.id)),

@@ -2,6 +2,11 @@
 // live in the agent-job runner module.
 import { join } from 'path';
 import { defineAgentJob, startAgentJob, isAgentJobRunning } from '../../lib/jobs/runner.ts';
+import { vaultDir, vaultPath } from '../../lib/content-paths.ts';
+
+// Delivery notes are human content in the vault; the lock/log stay in the
+// machine store (bind-mounted) so failed runs are debuggable from the host.
+const deliveriesVault = vaultPath('deliveries');
 
 export const populateDeliveriesJob = defineAgentJob({
   name: 'populate-deliveries',
@@ -10,11 +15,15 @@ export const populateDeliveriesJob = defineAgentJob({
   // claude output lands here (bind-mounted) so failed runs are debuggable from the host
   logFile: '.refresh-log',
   prompt: '/populate-deliveries',
+  // The vault lives outside /app — claude needs it added or the deliveries
+  // note reads/writes below are refused.
+  addDirs: [vaultDir()],
   allowedTools: [
     'mcp__claude_ai_Gmail__search_threads',
     'mcp__claude_ai_Gmail__get_thread',
     'Read(src/content/*)',
-    'Write(src/content/deliveries/deliveries.json)',
+    `Read(${deliveriesVault}/*)`,
+    `Write(${deliveriesVault}/*)`,
   ],
 });
 

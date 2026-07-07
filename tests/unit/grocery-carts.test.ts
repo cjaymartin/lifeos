@@ -1,13 +1,20 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 
-// grocery.ts resolves its content dir from process.cwd() at import time —
-// chdir into a sandbox BEFORE the dynamic import below.
+// grocery ops resolves its machine store from process.cwd() at import time —
+// chdir into a sandbox BEFORE the dynamic import below. The grocery *list* and
+// *staples* are human content that migrated into the vault, so also point
+// LIFEOS_VAULT_DIR at a throwaway vault under the same sandbox.
 const sandbox = mkdtempSync(join(tmpdir(), 'lifeos-grocery-'));
 const DIR = join(sandbox, 'src/content/grocery');
 mkdirSync(DIR, { recursive: true });
+const VAULT = join(sandbox, 'vault');
+const GROCERY_DIR = join(VAULT, 'grocery', 'list');
+const STAPLES_DIR = join(VAULT, 'grocery', 'staples');
+process.env.LIFEOS_VAULT_DIR = VAULT;
 const realCwd = process.cwd();
 process.chdir(sandbox);
 
@@ -15,6 +22,7 @@ const grocery = await import('@/features/grocery/ops');
 
 afterAll(() => {
   process.chdir(realCwd);
+  delete process.env.LIFEOS_VAULT_DIR;
   rmSync(sandbox, { recursive: true, force: true });
 });
 
@@ -28,6 +36,44 @@ function rm(file: string) {
   rmSync(join(DIR, file), { force: true });
 }
 
+// ── Vault helpers (grocery list + staples are one Markdown note per item) ─────
+function writeNotes(dir: string, items: Array<Record<string, any>>) {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  for (const it of items) {
+    writeFileSync(join(dir, `${it.id}.md`), `---\n${yamlDump(it)}---\n`);
+  }
+}
+function readNotes<T = any>(dir: string): T[] {
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith('.md') && !f.startsWith('.'));
+  } catch {
+    return [];
+  }
+  return files.map((f) => {
+    const raw = readFileSync(join(dir, f), 'utf-8');
+    const m = raw.match(/^---\n([\s\S]*?)\n---/);
+    return (m ? yamlLoad(m[1]) : {}) as T;
+  });
+}
+/** Seed the grocery list (vault). */
+function writeGrocery(items: Array<Record<string, any>>) {
+  writeNotes(GROCERY_DIR, items);
+}
+/** Read grocery list items back (vault). */
+function readGrocery<T = any>(): T[] {
+  return readNotes<T>(GROCERY_DIR);
+}
+/** Seed the staples (vault). */
+function writeStaples(staples: Array<Record<string, any>>) {
+  writeNotes(STAPLES_DIR, staples);
+}
+/** Read staples back (vault). */
+function readStaples<T = any>(): T[] {
+  return readNotes<T>(STAPLES_DIR);
+}
+
 const item = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
   id, name, category: 'Pantry', categoryConfirmed: true, staple: false,
   checked: false, addedAt: '2026-06-01T00:00:00Z', source: 'manual', ...extra,
@@ -35,12 +81,12 @@ const item = (id: string, name: string, extra: Record<string, unknown> = {}) => 
 
 beforeEach(() => {
   rm('carts.json'); rm('cart-request.json'); rm('product-map.json');
-  writeJson('staples.json', { staples: [] });
+  writeGrocery([]); writeStaples([]);
 });
 
 describe('assembleCarts', () => {
   it('resolves product-mapped items instantly into a cart with a rebuilt cartUrl', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeGrocery([item('milk-1', 'Milk')]);
     writeJson('product-map.json', {
       milk: { retailer: 'walmart', productId: '111', productUrl: 'https://www.walmart.com/ip/111', product: 'Great Value Milk' },
     });
@@ -57,7 +103,7 @@ describe('assembleCarts', () => {
   });
 
   it('queues unknown items for the agent via cart-request.json', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('weird-1', 'Dragonfruit Paste')] });
+    writeGrocery([item('weird-1', 'Dragonfruit Paste')]);
 
     const result = await grocery.assembleCarts();
     expect(result).toMatchObject({ instant: 0, queued: 1 });
@@ -66,7 +112,7 @@ describe('assembleCarts', () => {
   });
 
   it('never rebuilds lines already fully pushed to a retailer cart', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeGrocery([item('milk-1', 'Milk')]);
     writeJson('product-map.json', {
       milk: { retailer: 'walmart', productId: '111', productUrl: 'u', product: 'p' },
     });
@@ -81,7 +127,7 @@ describe('assembleCarts', () => {
   });
 
   it('a buyFrom preference overrides a cached product at the other retailer', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk', { buyFrom: 'amazon' })] });
+    writeGrocery([item('milk-1', 'Milk', { buyFrom: 'amazon' })]);
     writeJson('product-map.json', {
       milk: { retailer: 'walmart', productId: '111', productUrl: 'u', product: 'p' },
     });
@@ -91,14 +137,11 @@ describe('assembleCarts', () => {
   });
 
   it('itemIds limits the build to a selection; checked items are always excluded', async () => {
-    writeJson('grocery.json', {
-      lastUpdated: '',
-      items: [
-        item('a', 'Milk'),
-        item('b', 'Bread'),
-        item('c', 'Eggs', { checked: true }),
-      ],
-    });
+    writeGrocery([
+      item('a', 'Milk'),
+      item('b', 'Bread'),
+      item('c', 'Eggs', { checked: true }),
+    ]);
 
     const result = await grocery.assembleCarts(['b', 'c']);
     expect(result).toMatchObject({ instant: 0, queued: 1 });
@@ -106,10 +149,7 @@ describe('assembleCarts', () => {
   });
 
   it('bare-integer quantities become purchase counts; unit quantities do not', async () => {
-    writeJson('grocery.json', {
-      lastUpdated: '',
-      items: [item('m', 'Milk', { quantity: '2' }), item('b', 'Beef', { quantity: '1 lb' })],
-    });
+    writeGrocery([item('m', 'Milk', { quantity: '2' }), item('b', 'Beef', { quantity: '1 lb' })]);
     writeJson('product-map.json', {
       milk: { retailer: 'walmart', productId: '1', productUrl: 'u', product: 'p' },
       beef: { retailer: 'walmart', productId: '2', productUrl: 'u', product: 'p' },
@@ -145,7 +185,7 @@ describe('reconcileCartAdds', () => {
   });
 
   it('a reconciled line is then excluded from a fresh build (no duplicate re-add)', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeGrocery([item('milk-1', 'Milk')]);
     writeJson('product-map.json', {
       milk: { retailer: 'walmart', productId: '111', productUrl: 'u', product: 'p' },
     });
@@ -200,7 +240,7 @@ describe('adoptWalmartCartLine', () => {
     expect(res.itemId).toBeTruthy();
 
     // list item exists, flagged as a staple
-    const item = readJson('grocery.json').items.find((i: any) => i.id === res.itemId);
+    const item = readGrocery().find((i: any) => i.id === res.itemId);
     expect(item).toMatchObject({ name: 'Fairlife 2% Milk', staple: true, checked: false });
 
     // exact product pinned for future reorders
@@ -215,16 +255,16 @@ describe('adoptWalmartCartLine', () => {
     expect(cart.cartUrl).toContain('43984343');
 
     // staple created, stocked
-    expect(readJson('staples.json').staples.find((s: any) => s.name === 'Fairlife 2% Milk')).toMatchObject({ status: 'stocked' });
+    expect(readStaples().find((s: any) => s.name === 'Fairlife 2% Milk')).toMatchObject({ status: 'stocked' });
   });
 
   it('reuses an existing unchecked list item instead of duplicating', async () => {
-    writeJson('grocery.json', { lastUpdated: 'x', items: [
+    writeGrocery([
       { id: 'milk-1', name: 'milk', category: 'Dairy & Eggs', checked: false, addedAt: 'x', source: 'manual' },
-    ] });
+    ]);
     const res = await grocery.adoptWalmartCartLine({ productId: '99', product: 'milk', qty: 2 });
     expect(res.itemId).toBe('milk-1');
-    expect(readJson('grocery.json').items).toHaveLength(1);
+    expect(readGrocery()).toHaveLength(1);
     const line = readJson('carts.json').carts[0].items.find((m: any) => m.productId === '99');
     expect(line).toMatchObject({ itemId: 'milk-1', addedQty: 2 });
   });
@@ -232,7 +272,7 @@ describe('adoptWalmartCartLine', () => {
 
 describe('defaultQty', () => {
   it('overrides the parsed free-form quantity at build time', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('m', 'Milk', { quantity: '1 lb', defaultQty: 3 })] });
+    writeGrocery([item('m', 'Milk', { quantity: '1 lb', defaultQty: 3 })]);
     writeJson('product-map.json', { milk: { retailer: 'walmart', productId: '1', productUrl: 'u', product: 'p' } });
     await grocery.assembleCarts();
     expect(readJson('carts.json').carts[0].items[0].qty).toBe(3);
@@ -262,7 +302,7 @@ describe('setPin', () => {
 
 describe('checkoutItems — confirmed-purchase learning', () => {
   it('learns the exact product from the built cart line', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeGrocery([item('milk-1', 'Milk')]);
     writeJson('carts.json', {
       builtAt: 'x',
       carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [],
@@ -273,7 +313,7 @@ describe('checkoutItems — confirmed-purchase learning', () => {
   });
 
   it('does not overwrite a pinned product on checkout', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeGrocery([item('milk-1', 'Milk')]);
     writeJson('product-map.json', { milk: { retailer: 'walmart', productId: 'PINNED', pinned: true } });
     writeJson('carts.json', {
       builtAt: 'x',
@@ -287,7 +327,7 @@ describe('checkoutItems — confirmed-purchase learning', () => {
 
 describe('acceptSubstitute', () => {
   it('swaps an out-of-stock line to the chosen alternative and learns it', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('df', 'Dragonfruit')] });
+    writeGrocery([item('df', 'Dragonfruit')]);
     writeJson('carts.json', {
       builtAt: 'x',
       carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [
@@ -322,7 +362,7 @@ describe('acceptSubstitute', () => {
 
 describe('changeCartLineProduct', () => {
   it('swaps a line to a pasted product URL and pins it', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('milk-1', 'Milk')] });
+    writeGrocery([item('milk-1', 'Milk')]);
     writeJson('carts.json', {
       builtAt: 'x',
       carts: [{ retailer: 'walmart', label: 'Walmart', unmatched: [], items: [
@@ -352,23 +392,23 @@ describe('changeCartLineProduct', () => {
 
 describe('loadGroceryState — unavailable/refunded scan', () => {
   it('re-adds an unavailable item, refunds its purchase, and resets the staple', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [] });
-    writeJson('staples.json', { staples: [{ id: 'bb', name: 'blackberries', category: 'Produce', status: 'stocked', lastPurchased: '2026-06-04' }] });
+    writeGrocery([]);
+    writeStaples([{ id: 'bb', name: 'blackberries', category: 'Produce', status: 'stocked', lastPurchased: '2026-06-04' }]);
     writeJson('purchases.json', { purchases: [{ date: '2026-06-04', name: 'blackberries', source: 'walmart', orderId: 'O1' }] });
     writeJson('.scan-results.json', { unavailable: [{ name: 'blackberries', orderId: 'O1', date: '2026-06-04' }] });
 
     const state = await grocery.loadGroceryState();
     expect(state.items.some(i => i.name === 'blackberries' && i.source === 'scan')).toBe(true);
     expect(readJson('purchases.json').purchases[0].refunded).toBe(true);
-    const s = readJson('staples.json').staples[0];
+    const s = readStaples()[0];
     expect(s.status).toBe('out');
     expect(s.lastPurchased).toBeUndefined();
     expect(existsSync(join(DIR, '.scan-results.json'))).toBe(false);
   });
 
   it('a buy then refund in the same scan nets the item back on the list', async () => {
-    writeJson('grocery.json', { lastUpdated: '', items: [item('m', 'Milk')] });
-    writeJson('staples.json', { staples: [] });
+    writeGrocery([item('m', 'Milk')]);
+    writeStaples([]);
     writeJson('purchases.json', { purchases: [] });
     writeJson('.scan-results.json', {
       purchases: [{ name: 'Milk', retailer: 'walmart', orderId: 'O2', date: '2026-06-05', matchedItemIds: ['m'] }],

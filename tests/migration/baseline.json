@@ -1,36 +1,42 @@
 {
-  "capturedAt": "2026-06-30T14:47:13.212Z",
+  "capturedAt": "2026-07-07T12:54:22.135Z",
   "pages": {
     "/": {
       "id": "DASH",
       "title": "Dashboard",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/",
+      "finalURL": "http://127.0.0.1:4759/",
       "mustContain": [
-        "Trash Only week — no recycling this Wednesday",
-        "Next water delivery (ReadyRefresh) is July 10",
-        "ReadyRefresh",
-        "Poland Spring"
+        "Dinner reservation at The Black Whale — 5:00 PM"
       ],
-      "charCount": 1178,
+      "charCount": 973,
       "consoleErrors": []
     },
     "/tasks": {
       "id": "TASK",
       "title": "Tasks",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/tasks",
+      "finalURL": "http://127.0.0.1:4759/tasks",
       "mustContain": [
-        "Brush Teeth Evening"
+        "Do Something",
+        "Brush Teeth Morning",
+        "Brush Teeth Evening",
+        "Vacuum Downstairs",
+        "Vacuum Upstairs",
+        "Clean Bathrooms",
+        "Office Inspection (With Photos)",
+        "Take Fiber",
+        "Take GLP-1",
+        "Pay off Norwegian"
       ],
-      "charCount": 636,
+      "charCount": 1013,
       "consoleErrors": []
     },
     "/grocery": {
       "id": "GROC",
       "title": "Grocery",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/grocery",
+      "finalURL": "http://127.0.0.1:4759/grocery",
       "mustContain": [
         "Nature's Recipe Original Variety Pack (Chicken, Salmon & Turkey, 2.75 oz cups, 12-count)",
         "Nature's Recipe Grain Free Savory Broth Variety Pack (Chicken/Venison/Duck, 2.75 oz cups, 12-count)",
@@ -44,23 +50,19 @@
       "id": "DELIV",
       "title": "Deliveries",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/deliveries",
+      "finalURL": "http://127.0.0.1:4759/deliveries",
       "mustContain": [
-        "Nordstrom order",
-        "Pledge Multisurface cleaner",
-        "Hanes Men's Tagless Boxers (box 1 of 2)",
-        "Sugar Splash & 4 more items (box 2 of 2)",
-        "Nordstrom",
-        "Amazon"
+        "Escitalopram (10 mg, 90-day supply)",
+        "Amazon Pharmacy"
       ],
-      "charCount": 723,
+      "charCount": 404,
       "consoleErrors": []
     },
     "/recipes": {
       "id": "REC",
       "title": "Recipes index",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/recipes",
+      "finalURL": "http://127.0.0.1:4759/recipes",
       "mustContain": [
         "Brown Sugar Protein Creami",
         "Chocolate PB Protein Creami"
@@ -72,25 +74,25 @@
       "id": "SET",
       "title": "Settings",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/settings/logins",
+      "finalURL": "http://127.0.0.1:4759/settings/logins",
       "mustContain": [],
-      "charCount": 1301,
+      "charCount": 1302,
       "consoleErrors": []
     },
     "/settings/logins": {
       "id": "SETL",
       "title": "Settings · Logins",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/settings/logins",
+      "finalURL": "http://127.0.0.1:4759/settings/logins",
       "mustContain": [],
-      "charCount": 1301,
+      "charCount": 1302,
       "consoleErrors": []
     },
     "/recipes/brown-sugar-protein-creami": {
       "id": "REC-brown-sugar-protein-creami",
       "title": "Recipe · Brown Sugar Protein Creami",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/recipes/brown-sugar-protein-creami",
+      "finalURL": "http://127.0.0.1:4759/recipes/brown-sugar-protein-creami",
       "mustContain": [
         "Brown Sugar Protein Creami",
         "## Ingredients",
@@ -113,7 +115,7 @@
       "id": "REC-chocolate-pb-protein-creami",
       "title": "Recipe · Chocolate PB Protein Creami",
       "status": 200,
-      "finalURL": "http://127.0.0.1:4685/recipes/chocolate-pb-protein-creami",
+      "finalURL": "http://127.0.0.1:4759/recipes/chocolate-pb-protein-creami",
       "mustContain": [
         "Chocolate PB Protein Creami",
         "## Ingredients",

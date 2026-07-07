@@ -1,11 +1,11 @@
 ---
 name: populate-daily
-description: Generate today's morning briefing — reads the local tasks mirror, pulls Google Calendar events, weather for Mattapoisett MA, and Wednesday trash status, then writes src/content/daily/today.json.
+description: Generate today's morning briefing — reads the local tasks mirror, pulls Google Calendar events, weather for Mattapoisett MA, and Wednesday trash status, then writes the daily/today.md vault note.
 ---
 
 # Populate Daily Briefing
 
-Gather data from all sources, synthesise a brief, and write `src/content/daily/today.json`. This skill is designed to be run each morning via cron.
+Gather data from all sources, synthesise a brief, and write the `daily/today.md` note in the vault (`$LIFEOS_VAULT_DIR/daily/today.md`, default `~/obsidian/lifeos/daily/today.md`) — a YAML-frontmatter Markdown note. This skill is designed to be run each morning via cron.
 
 ## Owner context
 
@@ -43,11 +43,13 @@ Use `currentDate` from context or run `date` in bash. Format: YYYY-MM-DD. Also d
 
 ## Step 2 — Tasks (from the local mirror — do NOT call Todoist MCP tools)
 
-Tasks now sync continuously into a local mirror maintained by the Tasks stack
-(`src/lib/tasks/`). Read `src/content/tasks/tasks.json` instead of calling any
-Todoist tools. Each task has `content`, `projectId`, `priority` (1 = highest),
-and `due.date` (YYYY-MM-DD, may include a T…time part). Project names are in the
-`projects` array.
+Tasks now sync continuously into a local mirror maintained by the Tasks stack.
+Read the active-task notes in `$LIFEOS_VAULT_DIR/tasks/active/` (default
+`~/obsidian/lifeos/tasks/active/`) — one `<id>.md` per task, fields in YAML
+frontmatter — instead of calling any Todoist tools. Each task note has
+`content`, `projectId`, `priority` (1 = highest), and `due.date` (YYYY-MM-DD,
+may include a T…time part). Project names live in `src/content/tasks/meta.json`
+(the `projects` array).
 
 Collect (comparing `due.date`'s date part against today):
 - Tasks due today (with project names)
@@ -98,7 +100,7 @@ Ignore timed events and anything that doesn't match — this avoids pulling in u
 
 - Dedupe by `name` + `date` (the same person can appear on both calendars).
 - Sort ascending by date.
-- Write the result as the `birthdays` array in `today.json` (see Step 7). If none, write `[]` — the widget hides itself via its `has-events` condition.
+- Write the result as the `birthdays` array in the `today.md` note frontmatter (see Step 7). If none, write `[]` — the widget hides itself via its `has-events` condition.
 
 Mention any birthday **today or tomorrow** in the briefing (Step 6).
 
@@ -148,8 +150,8 @@ Set `trashNote` to any delay, cancellation, or special notice text found on the 
 ## Step 5.5 — Deliveries (delegated skill)
 
 Read `.claude/skills/populate-deliveries/SKILL.md` and follow it exactly — it scans
-Gmail for upcoming deliveries and writes `src/content/deliveries/deliveries.json`
-(a separate file from today.json, with its own refresh button on /deliveries).
+Gmail for upcoming deliveries and writes one note per delivery into the vault's
+`deliveries/` folder (separate from today.md, with its own refresh button on /deliveries).
 
 After it completes, note anything arriving **today** for the briefing.
 
@@ -172,11 +174,11 @@ from:readyrefresh.com OR subject:(ReadyRefresh OR "Primo Brands") newer_than:30d
 
 - Look at the most recent **reminder** email (`subject: Primo Brands… reminder for <weekday>, <Month D, YYYY>`). Parse the date out of the subject → `nextDate` (YYYY-MM-DD).
 - Order-confirmation emails (`Thank you for your order`) also appear; they confirm the upcoming delivery but the reminder subject is the cleanest date source. If only a confirmation exists, open it (`get_thread`) and read the scheduled date from the body.
-- Ignore any reminder whose parsed date is **in the past** (a delivery that already happened). If the most recent reminder is in the past and no future one exists yet, leave `water` out of `today.json` (omit the key) — the widget hides itself.
+- Ignore any reminder whose parsed date is **in the past** (a delivery that already happened). If the most recent reminder is in the past and no future one exists yet, leave `water` out of `today.md` (omit the key) — the widget hides itself.
 
 ### Output
 
-Write the `water` block in `today.json` (see Step 7):
+Write the `water` block in `today.md` (see Step 7):
 ```json
 { "nextDate": "YYYY-MM-DD", "vendor": "ReadyRefresh", "product": "Poland Spring", "note": null }
 ```
@@ -206,50 +208,56 @@ Example:
 
 ## Step 7 — Write the file
 
-Write `src/content/daily/today.json`:
+Write the vault note `$LIFEOS_VAULT_DIR/daily/today.md` (default
+`~/obsidian/lifeos/daily/today.md`) — a single Markdown note whose fields live in
+YAML frontmatter. Everything below goes between the `---` fences; leave the note
+body empty (or a one-line human-readable echo of the briefing if you like).
 
-```json
-{
-  "date": "YYYY-MM-DD",
-  "greeting": "Good morning, C.Jay.",
-  "briefing": "<synthesised paragraph>",
-  "weather": {
-    "code": <WMO weather code integer>,
-    "current": <temperature as number>,
-    "feelsLike": <apparent temperature as number>,
-    "condition": "<human-readable condition string>",
-    "high": <number>,
-    "low": <number>,
-    "wind": <wind speed as number>,
-    "precipitation": "<amount or 'None expected'>"
-  },
-  "tasks": {
-    "dueToday": <number>,
-    "overdue": <number>,
-    "items": ["<task 1>", "<task 2>", "..."]
-  },
-  "calendar": [
-    { "title": "<event>", "time": "<HH:MM AM/PM>", "soon": <boolean> }
-  ],
-  "trash": {
-    "today": <boolean>,
-    "recycling": <boolean>,
-    "note": "<string or null>"
-  },
-  "birthdays": [
-    { "name": "<person>", "date": "<YYYY-MM-DD>" }
-  ],
-  "water": {
-    "nextDate": "<YYYY-MM-DD>",
-    "vendor": "ReadyRefresh",
-    "product": "Poland Spring",
-    "note": "<string or null>"
-  },
-  "items": ["<bullet 1>", "<bullet 2>"]
-}
+```markdown
+---
+date: YYYY-MM-DD
+greeting: Good morning, C.Jay.
+briefing: <synthesised paragraph>
+weather:
+  code: <WMO weather code integer>
+  current: <temperature as number>
+  feelsLike: <apparent temperature as number>
+  condition: <human-readable condition string>
+  high: <number>
+  low: <number>
+  wind: <wind speed as number>
+  precipitation: <amount or 'None expected'>
+tasks:
+  dueToday: <number>
+  overdue: <number>
+  items:
+    - <task 1>
+    - <task 2>
+calendar:
+  - title: <event>
+    time: <HH:MM AM/PM>
+    soon: <boolean>
+trash:
+  today: <boolean>
+  recycling: <boolean>
+  note: <string or null>
+birthdays:
+  - name: <person>
+    date: <YYYY-MM-DD>
+water:
+  nextDate: <YYYY-MM-DD>
+  vendor: ReadyRefresh
+  product: Poland Spring
+  note: <string or null>
+items:
+  - <bullet 1>
+  - <bullet 2>
+---
 ```
 
-`items` is a flat list of the 3-5 most actionable things from the day — used as bullet points on the dashboard.
+`items` is a flat list of the 3-5 most actionable things from the day — used as
+bullet points on the dashboard. Omit optional blocks entirely (don't write the
+key) when a step didn't run or found nothing — the widgets hide themselves.
 
 ---
 

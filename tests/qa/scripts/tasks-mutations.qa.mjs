@@ -4,12 +4,13 @@
 // area is selected, so add/complete/reopen/edit/delete round-trip against an
 // in-memory fake backend — never a real Todoist account (NIM-7). Selected via:
 //   node tests/qa/run.mjs --area tasks-mutations
-import { startQA, expectVisible, readSandboxJson, poll, BASE } from './qa-lib.mjs';
+import { startQA, expectVisible, readSandboxJson, readSandboxVaultNotes, poll, BASE } from './qa-lib.mjs';
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const mirrorTasks = () => readSandboxJson('src/content/tasks/tasks.json').tasks ?? [];
+// Active tasks are per-note vault Markdown; projects live in machine meta.json.
+const mirrorTasks = () => readSandboxVaultNotes('tasks/active');
 const projectTarget = () => {
-  const ps = readSandboxJson('src/content/tasks/tasks.json').projects ?? [];
+  const ps = readSandboxJson('src/content/tasks/meta.json').projects ?? [];
   return ps.find((p) => p.inbox) ?? ps[0];
 };
 

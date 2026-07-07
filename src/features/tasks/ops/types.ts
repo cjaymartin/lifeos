@@ -68,7 +68,7 @@ export interface CompletedTask {
   completedAt: string;
 }
 
-/** The on-disk mirror — src/content/tasks/tasks.json */
+/** The assembled mirror — task notes in the vault + machine meta.json (see store.ts). */
 export interface TasksSnapshot {
   provider: string;
   /** Provider's incremental sync cursor (opaque) */

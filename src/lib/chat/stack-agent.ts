@@ -8,6 +8,7 @@
 
 import { join } from 'path';
 import { runAgentCapture } from '@/lib/jobs/runner';
+import { vaultDir } from '@/lib/content-paths';
 import { loadStackContent } from '@/lib/content-store';
 import { stacks, CHAT_BASE_TOOLS, loadChatGuide } from '@/features';
 
@@ -122,7 +123,9 @@ Today's date: ${new Date().toISOString().slice(0, 10)}`;
 export async function runStackChat(opts: StackChatOpts): Promise<StackChatResult> {
   const tools = resolveStackTools(opts.stackId, opts.approved ?? false);
   const prompt = await buildStackPrompt(opts);
-  const raw = await runAgentCapture({ prompt, allowedTools: tools });
+  // Feature content (grocery, recipes, …) now lives in the vault outside /app;
+  // add it so the agent's vault Read/Write isn't silently refused.
+  const raw = await runAgentCapture({ prompt, allowedTools: tools, addDirs: [vaultDir()] });
 
   if (!opts.approved) {
     const { cleanText, proposal } = parseProposal(raw);

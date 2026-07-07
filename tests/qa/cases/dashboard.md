@@ -18,12 +18,12 @@ Expected: URL and page title change accordingly.
 Last pass: 2026-06-06 · Status: pass
 
 ### DASH-4 — enabled has-data widgets render their data
-Steps: cross-check `widgets/registry.json` + `daily/today.json` against the rendered cards (weather condition, briefing text, tasks widget).
+Steps: cross-check `widgets/registry.json` + the `daily/today.md` vault note against the rendered cards (weather condition, briefing text, tasks widget).
 Expected: enabled widgets with data render it.
 Last pass: 2026-06-06 · Status: pass
 
 ### DASH-5 — conditional widgets respect displayCondition
-Steps: calendar (has-events) absent when today.json has no events; deliveries card present when undismissed deliveries exist.
+Steps: calendar (has-events) absent when today.md has no events; deliveries card present when undismissed deliveries exist.
 Expected: conditions honored.
 Last pass: 2026-06-06 · Status: pass
 

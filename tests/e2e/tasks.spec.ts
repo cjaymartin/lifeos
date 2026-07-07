@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readSandboxJson } from './helpers';
+import { readSandboxVaultNotes } from './helpers';
 
 function localISO(): string {
   const d = new Date();
@@ -23,10 +23,10 @@ test.describe('tasks stack', () => {
   });
 
   test('tasks from the local mirror render', async ({ page }) => {
-    const data = readSandboxJson<{ tasks: any[] }>('src/content/tasks/tasks.json');
+    const tasks = readSandboxVaultNotes<any>('tasks/active');
     await page.goto('/tasks');
 
-    const open = (data.tasks ?? []).filter((t: any) => !t.completed);
+    const open = tasks.filter((t: any) => !t.completed);
     const due = (t: any) => String(t.due?.date ?? t.due?.datetime ?? '').slice(0, 10);
     // The default Today view only shows overdue + due-today tasks, so pick one
     // of those; otherwise fall back to the earliest-due task under Upcoming.

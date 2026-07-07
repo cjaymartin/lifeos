@@ -9,7 +9,7 @@ Detect what the user actually bought (Walmart / Amazon order-confirmation emails
 
 ## Step 1 — Read the list
 
-Read `src/content/grocery/grocery.json` and `src/content/grocery/staples.json`. If the list is empty, write `{ "purchases": [] }` to `src/content/grocery/.scan-results.json` and stop.
+Read the grocery-list notes in `$LIFEOS_VAULT_DIR/grocery/list/` and the staple notes in `$LIFEOS_VAULT_DIR/grocery/staples/` (default `~/obsidian/lifeos/grocery/…`) — one `<id>.md` per item, fields in YAML frontmatter, `id` = filename minus `.md`. If the list is empty, write `{ "purchases": [] }` to `src/content/grocery/.scan-results.json` and stop.
 
 ## Step 2 — Search Gmail (last 7 days)
 
@@ -54,9 +54,9 @@ Write `src/content/grocery/.scan-results.json`:
 }
 ```
 
-- `matchedItemIds` — the exact `id`s from grocery.json this entry covers (usually one); fall back to name matching when you can't find an id.
+- `matchedItemIds` — the exact `id`s of the grocery-list notes this entry covers (usually one); fall back to name matching when you can't find an id.
 - `name` — the list item's name (helps the server fall back to name matching).
 - `purchases` = confirmed buys (removed + restocked). `unavailable` = items an order couldn't fulfill (re-added to the list; the matching purchase is marked refunded and the staple is set back to Out). Include the `orderId` on unavailable entries so the server ties the refund to the right order.
 - An item can appear in **both** (bought, then refunded) — that's fine; the server applies purchases first, then unavailability, so it nets back onto the list.
 - Always write the file, even with empty arrays — the UI waits on this run to finish.
-- Do **not** modify grocery.json, staples.json, or any other file — the server applies the changes.
+- Do **not** modify the grocery-list or staple notes, or any other file — the server applies the changes.

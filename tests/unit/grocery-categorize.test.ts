@@ -1,13 +1,19 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 
-// ops resolves its content dir from process.cwd() at import time — chdir into a
-// sandbox BEFORE the dynamic import below.
+// ops resolves its machine store from process.cwd() at import time — chdir into
+// a sandbox BEFORE the dynamic import below. The grocery list + staples migrated
+// into the vault, so also point LIFEOS_VAULT_DIR at a throwaway vault.
 const sandbox = mkdtempSync(join(tmpdir(), 'lifeos-grocery-cat-'));
 const DIR = join(sandbox, 'src/content/grocery');
 mkdirSync(DIR, { recursive: true });
+const VAULT = join(sandbox, 'vault');
+const GROCERY_DIR = join(VAULT, 'grocery', 'list');
+const STAPLES_DIR = join(VAULT, 'grocery', 'staples');
+process.env.LIFEOS_VAULT_DIR = VAULT;
 const realCwd = process.cwd();
 process.chdir(sandbox);
 
@@ -15,6 +21,7 @@ const grocery = await import('@/features/grocery/ops');
 
 afterAll(() => {
   process.chdir(realCwd);
+  delete process.env.LIFEOS_VAULT_DIR;
   rmSync(sandbox, { recursive: true, force: true });
 });
 
@@ -28,11 +35,39 @@ function rm(file: string) {
   rmSync(join(DIR, file), { force: true });
 }
 
+// ── Vault helpers (grocery list + staples are one Markdown note per item) ─────
+function writeNotes(dir: string, items: Array<Record<string, any>>) {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  for (const it of items) {
+    writeFileSync(join(dir, `${it.id}.md`), `---\n${yamlDump(it)}---\n`);
+  }
+}
+function readNotes<T = any>(dir: string): T[] {
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith('.md') && !f.startsWith('.'));
+  } catch {
+    return [];
+  }
+  return files.map((f) => {
+    const raw = readFileSync(join(dir, f), 'utf-8');
+    const m = raw.match(/^---\n([\s\S]*?)\n---/);
+    return (m ? yamlLoad(m[1]) : {}) as T;
+  });
+}
+function writeStaples(staples: Array<Record<string, any>>) {
+  writeNotes(STAPLES_DIR, staples);
+}
+function readStaples<T = any>(): T[] {
+  return readNotes<T>(STAPLES_DIR);
+}
+
 beforeEach(() => {
   rm('category-map.json');
   rm('.categories-migrated');
-  writeJson('staples.json', { staples: [] });
-  writeJson('grocery.json', { lastUpdated: '', items: [] });
+  writeStaples([]);
+  writeNotes(GROCERY_DIR, []);
 });
 
 describe('resolveCategory', () => {
@@ -72,24 +107,24 @@ describe('learnCategory', () => {
 
 describe('migrateStapleCategories (via loadGroceryState)', () => {
   it('re-files Other staples once and is idempotent', async () => {
-    writeJson('staples.json', { staples: [
+    writeStaples([
       { id: 'a', name: 'fairlife 2% milk', category: 'Other', status: 'stocked' },
       { id: 'b', name: 'paper plates', category: 'Other', status: 'stocked' },
       { id: 'c', name: 'dog food', category: 'Other', status: 'stocked' },
-    ] });
+    ]);
 
     await grocery.loadGroceryState();
-    let staples = readJson('staples.json').staples;
+    let staples = readStaples();
     expect(staples.find((x: any) => x.id === 'a').category).toBe('Dairy & Eggs');
     expect(staples.find((x: any) => x.id === 'b').category).toBe('Household');
     expect(staples.find((x: any) => x.id === 'c').category).toBe('Other'); // uncategorizable
     expect(existsSync(join(DIR, '.categories-migrated'))).toBe(true);
 
     // Idempotent: a deliberate later "Other" must NOT be re-filed on the next load
-    staples = readJson('staples.json').staples;
+    staples = readStaples();
     staples.find((x: any) => x.id === 'a').category = 'Other';
-    writeJson('staples.json', { staples });
+    writeStaples(staples);
     await grocery.loadGroceryState();
-    expect(readJson('staples.json').staples.find((x: any) => x.id === 'a').category).toBe('Other');
+    expect(readStaples().find((x: any) => x.id === 'a').category).toBe('Other');
   });
 });

@@ -88,6 +88,11 @@ export function defineAgentJob(cfg: {
   /** The `-p` payload — a skill invocation like '/populate-daily'. */
   prompt: string;
   allowedTools: string[];
+  /** Extra directories claude may read/write outside its working dir. The vault
+   *  lives outside the repo (/app), and claude confines file access to the cwd
+   *  unless a path is added here — without it, vault Read/Write is silently
+   *  refused even when allowedTools permits the exact path. */
+  addDirs?: string[];
   /** stream-json (requires --verbose in -p mode) emits each tool call as a
    *  realtime JSONL line — for jobs with a live progress feed. */
   stream?: boolean;
@@ -101,6 +106,7 @@ export function defineAgentJob(cfg: {
       '-p', cfg.prompt,
       ...(cfg.stream ? ['--output-format', 'stream-json', '--verbose'] : []),
       '--permission-mode', 'acceptEdits',
+      ...(cfg.addDirs ?? []).flatMap((d) => ['--add-dir', d]),
       '--allowedTools', cfg.allowedTools.join(' '),
     ],
   };
@@ -183,15 +189,25 @@ export function runAgentCapture(opts: {
   allowedTools: string[];
   timeoutMs?: number;
   logPath?: string;
+  /** Extra dirs claude may read/write outside its cwd — same vault-outside-/app
+   *  reason as defineAgentJob's addDirs; without it, vault Read/Write is silently
+   *  refused even when allowedTools permits the exact path. */
+  addDirs?: string[];
   /** Extra claude args appended verbatim (e.g. ['--permission-mode', 'acceptEdits']). */
   extraArgs?: string[];
 }): Promise<string> {
-  const { prompt, allowedTools, timeoutMs = 300_000, logPath, extraArgs = [] } = opts;
+  const { prompt, allowedTools, timeoutMs = 300_000, logPath, addDirs = [], extraArgs = [] } = opts;
   return new Promise((resolve, reject) => {
     const chunks: string[] = [];
     const proc = spawn(
       'claude',
-      ['-p', prompt, '--allowedTools', allowedTools.join(' '), '--output-format', 'text', ...extraArgs],
+      [
+        '-p', prompt,
+        '--allowedTools', allowedTools.join(' '),
+        '--output-format', 'text',
+        ...addDirs.flatMap((d) => ['--add-dir', d]),
+        ...extraArgs,
+      ],
       { cwd: process.cwd(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env }, detached: true },
     );
     if (logPath) {

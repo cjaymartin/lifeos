@@ -6,9 +6,10 @@
 //   await qa.check('DASH-1', 'renders title', async (page) => { ... });
 //   await qa.finish();   // writes tests/qa/.artifacts/results-<area>.json
 import { chromium } from 'playwright';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { load as yamlLoad } from 'js-yaml';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const PORT = process.env.QA_PORT ?? '4499';
@@ -20,6 +21,34 @@ export function sandboxPath(...parts) {
 }
 export function readSandboxJson(relative) {
   return JSON.parse(readFileSync(sandboxPath(relative), 'utf-8'));
+}
+export function sandboxVaultPath(...parts) {
+  return join(repo, '.test-sandbox', 'vault', ...parts);
+}
+/** Read a single sandbox-vault note's frontmatter (empty object if missing). */
+export function readSandboxVaultNote(relativePath) {
+  try {
+    const raw = readFileSync(sandboxVaultPath(relativePath), 'utf-8');
+    const m = raw.match(/^---\n([\s\S]*?)\n---/);
+    return m ? yamlLoad(m[1]) : {};
+  } catch {
+    return {};
+  }
+}
+/** Read every visible *.md note's frontmatter from a sandbox-vault directory. */
+export function readSandboxVaultNotes(relativeDir) {
+  const dir = sandboxVaultPath(relativeDir);
+  let files;
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith('.md') && !f.startsWith('.'));
+  } catch {
+    return [];
+  }
+  return files.map((f) => {
+    const raw = readFileSync(join(dir, f), 'utf-8');
+    const m = raw.match(/^---\n([\s\S]*?)\n---/);
+    return m ? yamlLoad(m[1]) : {};
+  });
 }
 
 /** Wait for a locator to be visible (plain-Playwright, no test runner). */

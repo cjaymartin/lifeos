@@ -6,6 +6,8 @@ import { getSnapshot } from '@/features/tasks/ops/store';
 import { ensureSyncLoop, getSyncStatus } from '@/features/tasks/ops/sync-loop';
 import { loadDeliveries } from '@/features/deliveries/ops';
 import { selectWidgets, type DailyData, type WidgetDef } from '@/lib/widgets';
+import { readNote } from '@/lib/markdown-store';
+import { vaultPath } from '@/lib/content-paths';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
@@ -49,12 +51,9 @@ try {
   registry = JSON.parse(raw);
 } catch {}
 
-// Load daily data
-let daily: DailyData | null = null;
-try {
-  const raw = await readFile(join(process.cwd(), 'src/content/daily/today.json'), 'utf-8');
-  daily = JSON.parse(raw);
-} catch {}
+// Load daily data — the morning briefing is a single vault note (frontmatter).
+const dailyNote = await readNote<DailyData>(vaultPath('daily', 'today.md'));
+const daily: DailyData | null = dailyNote?.data ?? null;
 
 // Load deliveries (own file + own sync lifecycle — not part of today.json)
 const deliveriesData = await loadDeliveries();

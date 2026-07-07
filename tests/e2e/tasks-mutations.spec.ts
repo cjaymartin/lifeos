@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { readSandboxJson } from './helpers';
+import { readSandboxJson, readSandboxVaultNotes } from './helpers';
 
 // Task-mutation coverage (NIM-7). Runs ONLY against the in-memory fake provider
 // (LIFEOS_FAKE_TASKS=1) — never a real Todoist account. The default
@@ -16,12 +16,13 @@ test.skip(
 test.describe.configure({ mode: 'serial' });
 
 function mirrorTasks(): any[] {
-  return readSandboxJson<{ tasks: any[] }>('src/content/tasks/tasks.json').tasks ?? [];
+  // Active tasks are now per-note vault Markdown (projects stay in meta.json).
+  return readSandboxVaultNotes<any>('tasks/active');
 }
 
 /** The project new tasks land in — inbox if present, else the first project. */
 function targetProject(): { id: string; name: string } {
-  const projects = readSandboxJson<{ projects: any[] }>('src/content/tasks/tasks.json').projects ?? [];
+  const projects = readSandboxJson<{ projects: any[] }>('src/content/tasks/meta.json').projects ?? [];
   const inbox = projects.find((p) => p.inbox) ?? projects[0];
   if (!inbox) throw new Error('sandbox has no project to add tasks into');
   return { id: inbox.id, name: inbox.name };

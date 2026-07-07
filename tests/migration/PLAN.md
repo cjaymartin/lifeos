@@ -1,6 +1,6 @@
 # LifeOS — Data-Integrity QA Test Plan
 
-_Generated 2026-06-30T14:47:13.212Z by tests/migration/spider.mjs._
+_Generated 2026-07-07T12:54:22.135Z by tests/migration/spider.mjs._
 
 ## Purpose
 
@@ -38,27 +38,33 @@ next to the baseline shots for visual diffing.
 ### DASH — Dashboard
 
 - **Route:** `/`
-- **Baseline status:** 200, 1178 chars rendered
+- **Baseline status:** 200, 973 chars rendered
 - **Screenshot:** `screenshots/baseline/DASH.png`
 - **What it covers:** Dashboard widgets (daily briefing items, task names, water vendor/product).
 - **Steps:** load the route in the authenticated session; let islands hydrate; read the rendered text.
-- **Expected tokens (must all be present, 4):**
-  - `Trash Only week — no recycling this Wednesday`
-  - `Next water delivery (ReadyRefresh) is July 10`
-  - `ReadyRefresh`
-  - `Poland Spring`
-- **Not asserted** (candidate data not visible on this view at baseline, 8): `Clear a few of the 6 overdue chores (fiber, teeth, vacuum downstairs)`, `Amazon Pledge cleaner arrives today`, `Mild and dry today — high 72°, no rain`, `Take Fiber (Inbox)`, `Do Something (Personal)`, `Brush Teeth Morning (Inbox)`, `Brush Teeth Evening (Inbox)`, `Vacuum Downstairs (Inbox)`
+- **Expected tokens (must all be present, 1):**
+  - `Dinner reservation at The Black Whale — 5:00 PM`
+- **Not asserted** (candidate data not visible on this view at baseline, 8): `Happy Independence Day 🎆`, `Hot one today: high near 94°, stay hydrated`, `7 overdue tasks to clear (vacuuming, bathrooms, fiber)`, `Do Something (Personal) — overdue`, `Brush Teeth Morning (Inbox) — overdue`, `Vacuum Upstairs (Inbox) — overdue`, `Clean Bathrooms (Inbox) — overdue`, `Take Fiber (Inbox) — overdue`
 
 ### TASK — Tasks
 
 - **Route:** `/tasks`
-- **Baseline status:** 200, 636 chars rendered
+- **Baseline status:** 200, 1013 chars rendered
 - **Screenshot:** `screenshots/baseline/TASK.png`
 - **What it covers:** Task list contents (active + completed).
 - **Steps:** load the route in the authenticated session; let islands hydrate; read the rendered text.
-- **Expected tokens (must all be present, 1):**
+- **Expected tokens (must all be present, 10):**
+  - `Do Something`
+  - `Brush Teeth Morning`
   - `Brush Teeth Evening`
-- **Not asserted** (candidate data not visible on this view at baseline, 27): `Do Something`, `Brush Teeth Morning`, `Vacuum Downstairs`, `Vacuum Upstairs`, `Clean Bathrooms`, `Office Inspection (With Photos)`, `Take Fiber`, `Take GLP-1`, …
+  - `Vacuum Downstairs`
+  - `Vacuum Upstairs`
+  - `Clean Bathrooms`
+  - `Office Inspection (With Photos)`
+  - `Take Fiber`
+  - `Take GLP-1`
+  - `Pay off Norwegian`
+- **Not asserted** (candidate data not visible on this view at baseline, 18): `Bravecto`, `Pay off 3272`, `Bidding Upgrade for Cruise!`, `Rimadyl`, `weeez`, `weee`, `test7`, `test2`, …
 
 ### GROC — Grocery
 
@@ -77,17 +83,13 @@ next to the baseline shots for visual diffing.
 ### DELIV — Deliveries
 
 - **Route:** `/deliveries`
-- **Baseline status:** 200, 723 chars rendered
+- **Baseline status:** 200, 404 chars rendered
 - **Screenshot:** `screenshots/baseline/DELIV.png`
 - **What it covers:** Delivery item descriptions + vendors.
 - **Steps:** load the route in the authenticated session; let islands hydrate; read the rendered text.
-- **Expected tokens (must all be present, 6):**
-  - `Nordstrom order`
-  - `Pledge Multisurface cleaner`
-  - `Hanes Men's Tagless Boxers (box 1 of 2)`
-  - `Sugar Splash & 4 more items (box 2 of 2)`
-  - `Nordstrom`
-  - `Amazon`
+- **Expected tokens (must all be present, 2):**
+  - `Escitalopram (10 mg, 90-day supply)`
+  - `Amazon Pharmacy`
 
 ### REC — Recipes index
 
@@ -103,7 +105,7 @@ next to the baseline shots for visual diffing.
 ### SET — Settings
 
 - **Route:** `/settings`
-- **Baseline status:** 200, 1301 chars rendered
+- **Baseline status:** 200, 1302 chars rendered
 - **Screenshot:** `screenshots/baseline/SET.png`
 - **What it covers:** Settings page renders (structural screenshot only).
 - **Steps:** load the route in the authenticated session; let islands hydrate; read the rendered text.
@@ -112,7 +114,7 @@ next to the baseline shots for visual diffing.
 ### SETL — Settings · Logins
 
 - **Route:** `/settings/logins`
-- **Baseline status:** 200, 1301 chars rendered
+- **Baseline status:** 200, 1302 chars rendered
 - **Screenshot:** `screenshots/baseline/SETL.png`
 - **What it covers:** Logins page renders (structural screenshot only).
 - **Steps:** load the route in the authenticated session; let islands hydrate; read the rendered text.

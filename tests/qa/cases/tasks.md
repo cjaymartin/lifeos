@@ -16,7 +16,7 @@ Expected: Today/Upcoming/Completed/Stats nav, sync status line.
 Last pass: 2026-06-06 · Status: pass
 
 ### TASK-2 — Today view shows overdue + due-today tasks only
-Steps: compare mirror tasks.json against the rendered Today view.
+Steps: compare the active-task vault notes against the rendered Today view.
 Expected: due ≤ today visible; strictly-future tasks absent.
 Last pass: 2026-06-06 · Status: pass
 
@@ -26,7 +26,7 @@ Expected: tasks with future due dates appear.
 Last pass: 2026-06-06 · Status: pass
 
 ### TASK-4 — Completed view renders the completed log
-Steps: switch to Completed; cross-check completed.json.
+Steps: switch to Completed; cross-check the completed-task vault notes.
 Expected: most recent completed task visible.
 Last pass: 2026-06-06 · Status: pass
 

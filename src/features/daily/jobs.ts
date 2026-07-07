@@ -7,6 +7,13 @@ import {
   runAgentJobBlocking,
   isAgentJobRunning,
 } from '../../lib/jobs/runner.ts';
+import { vaultDir, vaultPath } from '../../lib/content-paths.ts';
+
+// The briefing note and the data the agent reads/writes now live in the vault;
+// job plumbing (lock/log) stays in the machine store dir.
+const dailyVault = vaultPath('daily');
+const tasksActiveVault = vaultPath('tasks', 'active');
+const deliveriesVault = vaultPath('deliveries');
 
 export const populateDailyJob = defineAgentJob({
   name: 'populate-daily',
@@ -15,9 +22,13 @@ export const populateDailyJob = defineAgentJob({
   // claude output lands here (bind-mounted) so failed runs are debuggable from the host
   logFile: '.refresh-log',
   prompt: '/populate-daily',
+  // The vault lives outside /app — claude needs it added as a working dir or
+  // the tasks-mirror reads and daily/deliveries writes below are refused.
+  addDirs: [vaultDir()],
   allowedTools: [
-    // Tasks come from the local mirror (src/content/tasks/tasks.json) via Read —
-    // no Todoist MCP tools needed anymore; the Tasks stack syncs it continuously.
+    // Tasks come from the local mirror — now per-note vault Markdown under
+    // tasks/active — via Read; no Todoist MCP tools needed anymore, the Tasks
+    // stack syncs it continuously.
     'mcp__claude_ai_Google_Calendar__list_events',
     // Deliveries step (5.5) — delegated to the populate-deliveries skill
     'mcp__claude_ai_Gmail__search_threads',
@@ -25,9 +36,10 @@ export const populateDailyJob = defineAgentJob({
     'WebFetch',
     'Bash(curl *)',
     'Read(src/content/*)',
+    `Read(${tasksActiveVault}/*)`,
     'Read(.claude/skills/*)',
-    'Write(src/content/daily/today.json)',
-    'Write(src/content/deliveries/deliveries.json)',
+    `Write(${dailyVault}/today.md)`,
+    `Write(${deliveriesVault}/*)`,
   ],
 });
 

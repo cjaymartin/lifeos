@@ -1,15 +1,33 @@
 import { test, expect } from '@playwright/test';
-import { readSandboxJson } from './helpers';
+import { readSandboxJson, readSandboxVaultNotes } from './helpers';
+
+/** Dismissed delivery ids from the machine store (empty if none/unreadable). */
+function dismissedIds(): Set<string> {
+  try {
+    return new Set(
+      readSandboxJson<{ dismissed: { id: string }[] }>(
+        'src/content/deliveries/dismissed.json',
+      ).dismissed.map((d) => d.id),
+    );
+  } catch {
+    return new Set();
+  }
+}
 
 test.describe('deliveries stack', () => {
-  test('renders deliveries from deliveries.json', async ({ page }) => {
-    const data = readSandboxJson<{ deliveries: any[] }>('src/content/deliveries/deliveries.json');
+  test('renders deliveries from the vault', async ({ page }) => {
+    // Deliveries are now one Markdown note per delivery in the vault; the page
+    // hides dismissed ones (loadDeliveries filters them), so assert against the
+    // first non-dismissed note.
+    const deliveries = readSandboxVaultNotes<any>('deliveries');
+    const dismissed = dismissedIds();
+    const visible = deliveries.find((d) => !dismissed.has(d.id));
+
     await page.goto('/deliveries');
     await expect(page.locator('h1', { hasText: 'Deliveries' })).toBeVisible();
 
-    const first = data.deliveries?.[0];
-    if (first) {
-      await expect(page.getByText(first.vendor).first()).toBeVisible();
+    if (visible) {
+      await expect(page.getByText(visible.vendor).first()).toBeVisible();
     }
   });
 
@@ -26,9 +44,9 @@ test.describe('deliveries stack', () => {
         return null;
       }
     };
-    const data = readSandboxJson<{ deliveries: any[] }>('src/content/deliveries/deliveries.json');
+    const deliveries = readSandboxVaultNotes<any>('deliveries');
     const already = new Set((dismissedJson() ?? []).map((d) => d.id));
-    const target = data.deliveries?.find((d) => !already.has(d.id));
+    const target = deliveries.find((d) => !already.has(d.id));
     test.skip(!target, 'no visible deliveries in fixture data');
     const before = already.size;
 

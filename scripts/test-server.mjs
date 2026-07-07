@@ -16,8 +16,9 @@
 // survives the scrub below (no secret-ish name) and flips getProvider() to the
 // fake. The default (unset) run shows Todoist as "Not connected".
 
-import { cpSync, mkdirSync, rmSync, readFileSync, writeFileSync, globSync } from 'fs';
+import { cpSync, mkdirSync, rmSync, readFileSync, writeFileSync, globSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
+import { homedir } from 'os';
 import { fileURLToPath, pathToFileURL } from 'url';
 
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -37,6 +38,20 @@ const sandbox = join(repo, '.test-sandbox');
 rmSync(sandbox, { recursive: true, force: true });
 mkdirSync(join(sandbox, 'src'), { recursive: true });
 cpSync(join(repo, 'src/content'), join(sandbox, 'src/content'), { recursive: true });
+
+// Copy the Obsidian vault (human Markdown content) into the sandbox and point
+// LIFEOS_VAULT_DIR at the copy, so tests read/write a throwaway vault and never
+// touch the real one. The .obsidian config dir is skipped — the app never reads
+// it and it carries plugin bundles we don't want in the sandbox.
+const realVault = process.env.LIFEOS_VAULT_DIR || join(homedir(), 'obsidian', 'lifeos');
+const sandboxVault = join(sandbox, 'vault');
+if (existsSync(realVault)) {
+  cpSync(realVault, sandboxVault, {
+    recursive: true,
+    filter: (src) => !src.split(/[\\/]/).includes('.obsidian'),
+  });
+}
+mkdirSync(sandboxVault, { recursive: true });
 
 // Scrub job dot-files copied from the real tree — a fresh lock left by a real
 // agent run would make every job read as already-running inside tests.
@@ -64,6 +79,7 @@ for (const key of Object.keys(process.env)) {
   }
 }
 process.env.SESSION_SECRET = secret;
+process.env.LIFEOS_VAULT_DIR = sandboxVault;
 process.env.HOST = '127.0.0.1';
 process.env.PORT = process.env.LIFEOS_TEST_PORT ?? '4399';
 
