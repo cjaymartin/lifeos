@@ -63,6 +63,15 @@ if (existsSync(realVault)) {
 }
 mkdirSync(sandboxVault, { recursive: true });
 
+// Overlay committed vault fixtures (human Markdown — recipes, etc.) fill-if-
+// missing, mirroring the src/content overlay above. A dev machine with a real
+// vault keeps exercising it; a fresh CI checkout (no host vault) gets
+// deterministic recipe content instead of an empty recipes stack.
+const vaultFixtures = join(repo, 'tests/e2e/fixtures/vault');
+if (existsSync(vaultFixtures)) {
+  cpSync(vaultFixtures, sandboxVault, { recursive: true, force: false, errorOnExist: false });
+}
+
 // Scrub job dot-files copied from the real tree — a fresh lock left by a real
 // agent run would make every job read as already-running inside tests.
 for (const f of globSync(join(sandbox, 'src/content/**/.*'))) {
