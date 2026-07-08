@@ -146,6 +146,10 @@ export interface GroceryState {
   carts: CartsData | null;
   /** normalized item name → preferred/learned product */
   productMap: Record<string, ProductRef>;
+  /** Last-observed REAL Walmart cart (persisted from the extension push /
+   *  on-demand sync) so the live panel shows the cart on page load without a
+   *  manual Sync. null = never observed. */
+  liveCart: WalmartCartLine[] | null;
 }
 
 export const DEFAULT_CATEGORIES = [
@@ -224,6 +228,8 @@ export interface WalmartCartLine {
   price?: string;
   qty?: number;
   productUrl?: string;
+  /** A "delivery from store" tomorrow's-order tile (image-only, no /ip/ link). */
+  scheduled?: boolean;
 }
 
 /** An in-flight Walmart delivery scraped from the account/orders page. */

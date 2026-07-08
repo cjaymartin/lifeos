@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSessionOrToken } from '@/lib/auth';
 import { runWalmartOp } from '@/features/grocery/walmart-service';
+import { saveLiveCart } from '@/features/grocery/ops';
 import { WALMART_OPS, type WalmartOp } from '@/features/grocery/types';
 
 const json = (data: unknown, status = 200) =>
@@ -38,5 +39,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   }
 
   const result = await runWalmartOp(op, { productId, qty, items });
+  // Any op that returns the real cart (get/add/remove) reflects the current
+  // Walmart cart — persist it so the live panel stays fresh on the next load
+  // without a manual Sync.
+  if (result.ok && result.cart) await saveLiveCart(result.cart);
   return json(result, result.ok ? 200 : 502);
 };

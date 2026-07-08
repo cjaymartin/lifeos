@@ -89,12 +89,15 @@
     return items;
   }
 
-  // Cart scrape front door: expand collapsed strips, prefer the scoped line-item
-  // scrape, fall back to the raw link scan only if the scoped one finds nothing.
+  // Cart scrape front door: expand collapsed strips, then return ONLY the scoped
+  // line-item scrape. We deliberately do NOT fall back to the raw `a[href*="/ip/"]`
+  // scan here: the cart page is wall-to-wall recommendation carousels ("you may
+  // also like", "bought 5+ times"), all carrying /ip/ links, so the raw scan
+  // reports a genuinely EMPTY cart as ~two dozen products. An empty scoped scrape
+  // means the cart is empty (or still rendering — scrapeStable re-tries for that).
   function scrapeCart() {
     expandCollapsedLists();
-    const scoped = scrapeCartLines();
-    return scoped.length ? scoped : scrapeProducts();
+    return scrapeCartLines();
   }
 
   function scrapeDeliveries() {

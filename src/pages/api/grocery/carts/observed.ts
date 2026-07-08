@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireSessionOrToken } from '@/lib/auth';
-import { applyObservedCart } from '@/features/grocery/ops';
-import type { Retailer } from '@/features/grocery/types';
+import { applyObservedCart, saveLiveCart } from '@/features/grocery/ops';
+import type { Retailer, WalmartCartLine } from '@/features/grocery/types';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -18,9 +18,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (denied) return denied;
 
   let retailer: Retailer;
-  let items: { productId: string; qty?: number }[];
+  let items: WalmartCartLine[];
   try {
-    const body = await request.json() as { retailer: Retailer; items?: { productId: string; qty?: number }[] };
+    const body = await request.json() as { retailer: Retailer; items?: WalmartCartLine[] };
     retailer = body.retailer;
     items = Array.isArray(body.items) ? body.items.filter(i => i && typeof i.productId === 'string') : [];
     if (!retailer || !['walmart', 'amazon'].includes(retailer)) throw new Error();
@@ -30,5 +30,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   const { ok, inCart, unknown } = await applyObservedCart(retailer, items);
   if (!ok) return new Response('Not found', { status: 404 });
+  // Persist the observed cart so the live panel shows it on page load without a
+  // manual Sync (the extension pushes here whenever the user's on their cart).
+  if (retailer === 'walmart') await saveLiveCart(items);
   return json({ ok: true, inCart, unknown });
 };

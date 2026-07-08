@@ -793,7 +793,9 @@ export default function GroceryApp({ initial }: { initial: GroceryState }) {
    *     unlike the deep-link handoff above. ───────────────────────────────── */
   const [liveBusy, setLiveBusy] = useState(false);
   const [liveMsg, setLiveMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
-  const [liveCart, setLiveCart] = useState<WalmartCartLine[] | null>(null);
+  // Seed from the last-observed cart persisted server-side (extension push /
+  // prior sync) so the live panel shows the cart on load — no manual Sync.
+  const [liveCart, setLiveCart] = useState<WalmartCartLine[] | null>(initial.liveCart ?? null);
   const [liveCartState, setLiveCartState] = useState<JobState>('idle');
   const [liveExec, setLiveExec] = useState<'extension' | 'fallback' | undefined>(undefined);
 

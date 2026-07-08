@@ -6,7 +6,7 @@ import { writeJson } from '@/lib/content-store';
 import { readCollection, writeCollection, noteStem } from '@/lib/markdown-store';
 import { contentPath, vaultPath } from '@/lib/content-paths';
 import type {
-  CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, OrderHistory, OrderedProduct, ProductRef, PurchaseRecord, Retailer, Staple,
+  CartMatch, CartsData, GroceryData, GroceryItem, GroceryState, OrderHistory, OrderedProduct, ProductRef, PurchaseRecord, Retailer, Staple, WalmartCartLine,
 } from '@/features/grocery/types';
 import { buildAddToCartUrl, normalizeName, RETAILER_LABELS, DEFAULT_CATEGORIES } from '@/features/grocery/types';
 
@@ -29,6 +29,11 @@ export const CATEGORY_MAP_FILE = join(DIR, 'category-map.json');
 export const ORDER_HISTORY_FILE = join(DIR, 'order-history.json');
 // One-shot marker so the "re-file existing Other staples" migration runs once.
 const CATEGORIES_MIGRATED_FILE = join(DIR, '.categories-migrated');
+// Last-observed REAL Walmart cart, persisted from the extension push
+// (content-cart.js) and the on-demand get-cart sync. The live panel reads this
+// on page load so the cart shows without a manual Sync. Dot-prefixed → machine
+// state, hidden from the stack chat's content dump.
+export const LIVE_CART_FILE = join(DIR, '.live-cart.json');
 // Optional per-build item selection, written by the build-carts API and read
 // by the /build-carts skill (absent → build for all unchecked items)
 export const CART_REQUEST_FILE = join(DIR, 'cart-request.json');
@@ -123,6 +128,24 @@ export async function loadCarts(): Promise<CartsData | null> {
 export async function saveCarts(carts: CartsData | null): Promise<void> {
   if (carts) await writeJson(CARTS_FILE, carts);
   else { try { await unlink(CARTS_FILE); } catch {} }
+}
+
+interface LiveCartStore {
+  observedAt: string;
+  items: WalmartCartLine[];
+}
+
+/** Last-observed real Walmart cart (null if never observed). */
+export async function loadLiveCart(): Promise<WalmartCartLine[] | null> {
+  const data = await readJson<LiveCartStore>(LIVE_CART_FILE);
+  return data?.items ?? null;
+}
+
+/** Persist the real Walmart cart as last observed. Called whenever a live cart
+ *  crosses the wire — the extension push (content-cart.js) or an on-demand
+ *  get-cart sync — so the UI can show it on next load without a manual Sync. */
+export async function saveLiveCart(items: WalmartCartLine[]): Promise<void> {
+  await writeJson(LIVE_CART_FILE, { observedAt: new Date().toISOString(), items });
 }
 
 export async function loadProductMap(): Promise<Record<string, ProductRef>> {
@@ -344,8 +367,8 @@ async function markPurchasesRefunded(items: { name: string; orderId?: string }[]
 
 export async function loadGroceryState(): Promise<GroceryState> {
   await migrateStapleCategories(); // one-time re-file of "Other" staples
-  const [grocery, staples, carts, productMap] = await Promise.all([
-    loadGrocery(), loadStaples(), loadCarts(), loadProductMap(),
+  const [grocery, staples, carts, productMap, liveCart] = await Promise.all([
+    loadGrocery(), loadStaples(), loadCarts(), loadProductMap(), loadLiveCart(),
   ]);
   let groceryDirty = false;
   let staplesDirty = false;
@@ -433,7 +456,7 @@ export async function loadGroceryState(): Promise<GroceryState> {
   if (groceryDirty) await saveGrocery(grocery);
   if (staplesDirty) await saveStaples(staples);
 
-  return { lastUpdated: grocery.lastUpdated, items: grocery.items, staples, carts, productMap };
+  return { lastUpdated: grocery.lastUpdated, items: grocery.items, staples, carts, productMap, liveCart };
 }
 
 /* ── Cart assembly ─────────────────────────────────────────────────────────

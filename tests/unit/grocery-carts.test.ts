@@ -230,6 +230,42 @@ describe('applyObservedCart', () => {
   });
 });
 
+describe('live-cart persistence', () => {
+  beforeEach(() => rm('.live-cart.json'));
+
+  it('loadLiveCart returns null before anything is observed', async () => {
+    expect(await grocery.loadLiveCart()).toBeNull();
+  });
+
+  it('saveLiveCart persists lines that loadLiveCart reads back', async () => {
+    const lines = [
+      { productId: '1', product: 'Milk', productUrl: 'u', price: '$4' },
+      { productId: '2', product: 'Eggs', scheduled: true },
+    ];
+    await grocery.saveLiveCart(lines);
+    expect(await grocery.loadLiveCart()).toEqual(lines);
+    // stored with an observedAt timestamp alongside the items
+    expect(typeof readJson('.live-cart.json').observedAt).toBe('string');
+  });
+
+  it('saveLiveCart([]) records a genuinely empty cart (not null)', async () => {
+    await grocery.saveLiveCart([{ productId: '1', product: 'Milk' }]);
+    await grocery.saveLiveCart([]);
+    expect(await grocery.loadLiveCart()).toEqual([]);
+  });
+
+  it('loadGroceryState surfaces the persisted live cart', async () => {
+    await grocery.saveLiveCart([{ productId: '7', product: 'Bananas' }]);
+    const state = await grocery.loadGroceryState();
+    expect(state.liveCart).toEqual([{ productId: '7', product: 'Bananas' }]);
+  });
+
+  it('loadGroceryState reports liveCart null when nothing was ever observed', async () => {
+    const state = await grocery.loadGroceryState();
+    expect(state.liveCart).toBeNull();
+  });
+});
+
 describe('adoptWalmartCartLine', () => {
   it('adds a list item already-in-cart, pins the product, and can make a staple', async () => {
     const res = await grocery.adoptWalmartCartLine({
