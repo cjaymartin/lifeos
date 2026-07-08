@@ -93,11 +93,6 @@ async function askTab(tabId, msg, retries = 6) {
   }
 }
 
-function addToCartUrl(items) {
-  const parts = items.map((it) => (it.qty && it.qty > 1 ? `${it.productId}_${it.qty}` : it.productId));
-  return `https://affil.walmart.com/cart/addToCart?items=${parts.join(',')}`;
-}
-
 async function executeCommand(cmd) {
   const tab = await getWalmartTab();
   const tabId = tab.id;
@@ -117,13 +112,46 @@ async function executeCommand(cmd) {
       const items = (cmd.params.items && cmd.params.items.length)
         ? cmd.params.items
         : [{ productId: cmd.params.productId, qty: cmd.params.qty }];
-      await navigate(tabId, addToCartUrl(items));
+      // Add each item via its product page's own "Add to cart" button, in the
+      // user's logged-in session. The affiliate deep link (addToCartUrl) silently
+      // failed to land items, so we drive the real UI and refuse to claim success
+      // if the button never took.
+      for (const it of items) {
+        const times = it.qty && it.qty > 1 ? it.qty : 1;
+        for (let n = 0; n < times; n++) {
+          await navigate(tabId, `${WALMART}/ip/${it.productId}`);
+          const r = await action('add-to-cart', { productId: it.productId });
+          if (!r || !r.ok || !r.added) throw new Error(`could not add ${it.productId} to cart`);
+        }
+      }
       await navigate(tabId, `${WALMART}/cart`);
-      return action('scrape-cart');
+      const res = await action('scrape-cart');
+      // Verify the add actually landed. `add-to-cart` reports success on merely
+      // *clicking* an add button, which can no-op (out-of-stock, needs options) or
+      // mis-fire on a recommendation. Now that scrape-cart is scoped to real line
+      // items (price-per-unit lines + scheduled tiles, no recommendations), a
+      // requested id missing from the cart means the add silently failed — so we
+      // surface ok:false instead of a false success.
+      const cart = (res && res.cart) || [];
+      const missing = items
+        .map((it) => String(it.productId))
+        .filter((id) => !cart.some((c) => String(c.productId) === id));
+      if (missing.length) {
+        return { ok: false, error: `add did not land in cart: ${missing.join(', ')}`, cart };
+      }
+      return res;
     }
-    case 'remove-item':
+    case 'remove-item': {
       await navigate(tabId, `${WALMART}/cart`);
-      return action('remove-item', { productId: cmd.params.productId });
+      const r = await action('remove-item', { productId: cmd.params.productId });
+      // The content script reports `removed` from a post-op cart re-scrape (id
+      // gone = true). A click that never landed on the line leaves it present, so
+      // surface that as a failure instead of a false success.
+      if (!r || !r.ok || !r.removed) {
+        throw new Error(`could not remove ${cmd.params.productId} from cart`);
+      }
+      return r;
+    }
     default:
       throw new Error(`unknown op: ${cmd.op}`);
   }

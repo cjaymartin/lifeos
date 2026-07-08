@@ -73,6 +73,30 @@ describe('walmart command queue', () => {
     await expect(q.recordResult('nope', { ok: false, error: 'x' })).resolves.toBeUndefined();
   });
 
+  it('re-claims a command stuck in claimed past the stale window (dead executor)', async () => {
+    // A command claimed 60s ago whose executor never reported back — a fresh poll
+    // must re-offer it so it isn't wedged forever.
+    writeFileSync(QUEUE, JSON.stringify({
+      commands: [{
+        id: 'wm_stuck', op: 'get-cart', params: {}, status: 'claimed',
+        createdAt: Date.now() - 60_000, claimedAt: Date.now() - 60_000,
+      }],
+    }));
+    const claimed = await q.claimPending();
+    expect(claimed.map((c) => c.id)).toContain('wm_stuck');
+  });
+
+  it('does not re-claim a freshly claimed command (executor still working)', async () => {
+    writeFileSync(QUEUE, JSON.stringify({
+      commands: [{
+        id: 'wm_fresh', op: 'get-cart', params: {}, status: 'claimed',
+        createdAt: Date.now(), claimedAt: Date.now(),
+      }],
+    }));
+    const claimed = await q.claimPending();
+    expect(claimed.map((c) => c.id)).not.toContain('wm_fresh');
+  });
+
   it('prunes commands older than the retention window', async () => {
     // Write a stale command directly, then enqueue a fresh one — the stale one
     // should be dropped on the next mutation.
