@@ -1,0 +1,27 @@
+{
+  "provider": "todoist",
+  "syncToken": "*",
+  "version": 0,
+  "projects": [
+    {
+      "id": "fixture-inbox",
+      "name": "Inbox",
+      "color": "grey",
+      "parentId": null,
+      "order": 0,
+      "favorite": false,
+      "inbox": true
+    },
+    {
+      "id": "fixture-personal",
+      "name": "Personal",
+      "color": "salmon",
+      "parentId": null,
+      "order": 1,
+      "favorite": false,
+      "inbox": false
+    }
+  ],
+  "sections": [],
+  "labels": []
+}

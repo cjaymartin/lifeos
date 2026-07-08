@@ -39,6 +39,16 @@ rmSync(sandbox, { recursive: true, force: true });
 mkdirSync(join(sandbox, 'src'), { recursive: true });
 cpSync(join(repo, 'src/content'), join(sandbox, 'src/content'), { recursive: true });
 
+// Overlay committed e2e fixtures for content that's gitignored (local-first
+// runtime data — tasks/meta.json, etc. — never lives in the repo, so a fresh CI
+// checkout has none of it). fill-if-missing: only seed a file the sandbox lacks,
+// so a dev machine with real content keeps exercising that, while CI gets a
+// deterministic fixture instead of crashing on the empty tree.
+const fixtures = join(repo, 'tests/e2e/fixtures/content');
+if (existsSync(fixtures)) {
+  cpSync(fixtures, join(sandbox, 'src/content'), { recursive: true, force: false, errorOnExist: false });
+}
+
 // Copy the Obsidian vault (human Markdown content) into the sandbox and point
 // LIFEOS_VAULT_DIR at the copy, so tests read/write a throwaway vault and never
 // touch the real one. The .obsidian config dir is skipped — the app never reads
